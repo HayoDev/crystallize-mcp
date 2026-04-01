@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "bracketSpacing": false,
+  "bracketSpacing": true,
   "singleQuote": true,
   "trailingComma": "all",
   "arrowParens": "avoid",

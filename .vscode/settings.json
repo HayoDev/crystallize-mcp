@@ -4,8 +4,12 @@
   "editor.formatOnSaveMode": "file",
   "oxc.enable.oxfmt": true,
   "oxc.enable.oxlint": true,
-  "oxc.lint.configPath": ".oxlintrc.json",
   "oxc.fmt.configPath": ".oxfmtrc.json",
+  "oxc.trace.server": "verbose",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit",
+    "source.fixAll.eslint": "explicit"
+  },
   "[typescript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
@@ -17,5 +21,13 @@
   },
   "[markdown]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.(ts|js|json|md)$",
+        "cmd": "npx oxfmt --write ${file}"
+      }
+    ]
   }
 }

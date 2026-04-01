@@ -6,6 +6,8 @@
   },
   "plugins": ["typescript"],
   "rules": {
+    "no-var": "error",
+    "prefer-const": "error",
     "curly": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-floating-promises": "error",

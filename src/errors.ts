@@ -2,7 +2,7 @@
  * Categorized error handling for actionable error messages.
  */
 
-import type {ErrorCategory} from './types.js';
+import type { ErrorCategory } from './types.js';
 
 export class CrystallizeToolError extends Error {
   constructor(
@@ -28,14 +28,22 @@ export function formatError(error: unknown): string {
   let message: string;
   if (error instanceof Error) {
     message = error.message;
-  } else if (typeof error === 'object' && error !== null && 'message' in error) {
-    message = String((error as {message: unknown}).message);
+  } else if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error
+  ) {
+    message = String((error as { message: unknown }).message);
   } else {
     message = String(error);
   }
 
   // Detect common API error patterns and add hints
-  if (message.includes('401') || message.includes('Unauthorized') || message.includes('authentication')) {
+  if (
+    message.includes('401') ||
+    message.includes('Unauthorized') ||
+    message.includes('authentication')
+  ) {
     return `Error: Authentication failed.\nHint: Check CRYSTALLIZE_ACCESS_TOKEN_ID and CRYSTALLIZE_ACCESS_TOKEN_SECRET env vars.`;
   }
 
@@ -47,7 +55,11 @@ export function formatError(error: unknown): string {
     return `Error: API rate limited.\nHint: Wait a moment and retry.`;
   }
 
-  if (message.includes('404') || message.includes('not found') || message.includes('Not Found')) {
+  if (
+    message.includes('404') ||
+    message.includes('not found') ||
+    message.includes('Not Found')
+  ) {
     return `Error: ${message}\nHint: Check the path or identifier — use browse_catalogue or list_shapes to explore what's available.`;
   }
 

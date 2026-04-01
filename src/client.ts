@@ -50,7 +50,8 @@ export class CrystallizeClient {
       );
     }
 
-    const accessMode = (process.env.CRYSTALLIZE_ACCESS_MODE ?? 'read') as CrystallizeConfig['accessMode'];
+    const accessMode = (process.env.CRYSTALLIZE_ACCESS_MODE ??
+      'read') as CrystallizeConfig['accessMode'];
     if (!['read', 'write', 'admin'].includes(accessMode)) {
       throw new Error(
         `Invalid CRYSTALLIZE_ACCESS_MODE: "${accessMode}". Must be "read", "write", or "admin".`,
