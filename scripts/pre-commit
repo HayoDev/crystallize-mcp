@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "Running pre-commit checks..."
+
+# Block commits that contain secrets or env files
+BLOCKED_FILES=$(git diff --cached --name-only | grep -E '\.env|credentials|secret|token' || true)
+if [ -n "$BLOCKED_FILES" ]; then
+  echo "❌ Blocked: these files may contain secrets:"
+  echo "$BLOCKED_FILES"
+  echo "If intentional, use git commit --no-verify"
+  exit 1
+fi
+
+# Auto-fix formatting on staged files
+echo "→ Fixing lint + formatting..."
+npm run format 2>/dev/null
+
+# Re-stage any files that were auto-fixed
+FIXED_FILES=$(git diff --name-only)
+if [ -n "$FIXED_FILES" ]; then
+  echo "→ Re-staging auto-fixed files..."
+  echo "$FIXED_FILES" | xargs git add
+fi
+
+echo "Pre-commit done."

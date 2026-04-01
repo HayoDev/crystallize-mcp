@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.HayoDev/crystallize-mcp",
+  "title": "Crystallize MCP",
+  "description": "MCP server for Crystallize headless commerce — browse catalogue, search products, inspect shapes, and manage orders for AI agents",
+  "repository": {
+    "url": "https://github.com/HayoDev/crystallize-mcp",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "crystallize-mcp",
+      "version": "0.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CRYSTALLIZE_TENANT_IDENTIFIER",
+          "description": "Your Crystallize tenant identifier (e.g. 'my-store'). Find it in your Crystallize dashboard URL: app.crystallize.com/{tenant}",
+          "required": true
+        },
+        {
+          "name": "CRYSTALLIZE_ACCESS_TOKEN_ID",
+          "description": "Access Token ID for authenticated API access. Create one at Settings > Access Tokens in your Crystallize dashboard. Optional — public catalogue and Discovery API work without auth.",
+          "required": false
+        },
+        {
+          "name": "CRYSTALLIZE_ACCESS_TOKEN_SECRET",
+          "description": "Access Token Secret (paired with Access Token ID).",
+          "required": false
+        },
+        {
+          "name": "CRYSTALLIZE_STATIC_AUTH_TOKEN",
+          "description": "Static auth token (alternative to token ID/secret pair). Read-only.",
+          "required": false
+        },
+        {
+          "name": "CRYSTALLIZE_ACCESS_MODE",
+          "description": "Controls which tools are available: 'read' (default, safe), 'write' (can create/update items), 'admin' (full access including webhooks).",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

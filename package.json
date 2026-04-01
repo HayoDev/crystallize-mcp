@@ -1,0 +1,60 @@
+{
+  "name": "crystallize-mcp",
+  "version": "0.1.0",
+  "description": "Crystallize MCP — headless commerce tools for AI agents. Browse catalogue, search products, inspect shapes, manage orders via Model Context Protocol.",
+  "type": "module",
+  "main": "build/src/index.js",
+  "bin": {
+    "crystallize-mcp": "build/src/bin/crystallize-mcp.js"
+  },
+  "files": [
+    "build/src",
+    "LICENSE",
+    "!*.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf build",
+    "start": "node build/src/bin/crystallize-mcp.js",
+    "dev": "npm run build && npm start",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxlint --fix && oxfmt --write .",
+    "check-format": "oxlint && oxfmt --check .",
+    "test": "npm run build && node --test build/tests/**/*.test.js",
+    "test:no-build": "node --test build/tests/**/*.test.js",
+    "prepare": "sh scripts/install-hooks.sh"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "crystallize",
+    "headless-commerce",
+    "ecommerce",
+    "pim",
+    "catalogue",
+    "graphql",
+    "model-context-protocol",
+    "ai-agents",
+    "ai-coding",
+    "claude",
+    "cursor",
+    "copilot"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@crystallize/js-api-client": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "oxfmt": "^0.42.0",
+    "oxlint": "^1.58.0",
+    "typescript": "^5.7.0"
+  }
+}

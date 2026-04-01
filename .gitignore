@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# MCP Registry
+.mcpregistry_*
+
+# IDE (keep .vscode/ tracked for shared settings)
+.idea/
+
+# Claude Code (personal/local — .agent/ is the shared agnostic config)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+.eslintcache
+.prettiercache
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Internal roadmap (not published)
+ROADMAP.md
