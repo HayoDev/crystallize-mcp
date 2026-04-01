@@ -25,7 +25,14 @@ export function formatError(error: unknown): string {
     return parts.join('\n');
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  let message: string;
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === 'object' && error !== null && 'message' in error) {
+    message = String((error as {message: unknown}).message);
+  } else {
+    message = String(error);
+  }
 
   // Detect common API error patterns and add hints
   if (message.includes('401') || message.includes('Unauthorized') || message.includes('authentication')) {
