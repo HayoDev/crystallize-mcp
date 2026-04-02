@@ -1,7 +1,7 @@
-import {describe, it} from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import {createCrystallizeMcpServer} from '../src/index.js';
-import {CrystallizeClient} from '../src/client.js';
+import { createCrystallizeMcpServer } from '../src/index.js';
+import { CrystallizeClient } from '../src/client.js';
 
 describe('createCrystallizeMcpServer', () => {
   it('should create a server and client', () => {
@@ -55,10 +55,14 @@ describe('CrystallizeClient', () => {
 
 describe('error formatting', () => {
   it('should format categorized errors', async () => {
-    const {formatError} = await import('../src/errors.js');
-    const {CrystallizeToolError} = await import('../src/errors.js');
+    const { formatError } = await import('../src/errors.js');
+    const { CrystallizeToolError } = await import('../src/errors.js');
 
-    const error = new CrystallizeToolError('Item not found', 'not_found', 'Try browse_catalogue');
+    const error = new CrystallizeToolError(
+      'Item not found',
+      'not_found',
+      'Try browse_catalogue',
+    );
     const formatted = formatError(error);
 
     assert.ok(formatted.includes('Item not found'));
@@ -66,7 +70,7 @@ describe('error formatting', () => {
   });
 
   it('should detect auth errors from raw messages', async () => {
-    const {formatError} = await import('../src/errors.js');
+    const { formatError } = await import('../src/errors.js');
 
     const formatted = formatError(new Error('401 Unauthorized'));
     assert.ok(formatted.includes('CRYSTALLIZE_ACCESS_TOKEN'));

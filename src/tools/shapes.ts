@@ -2,9 +2,9 @@
  * Shape & tenant tools — inspect shapes, components, and tenant configuration.
  */
 
-import {z} from 'zod';
-import type {CrystallizeClient} from '../client.js';
-import type {ToolDefinition} from '../types.js';
+import { z } from 'zod';
+import type { CrystallizeClient } from '../client.js';
+import type { ToolDefinition } from '../types.js';
 
 export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
   return [
@@ -15,9 +15,9 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
       schema: {},
       handler: async () => {
         const query = `
-          query ListShapes {
+          query ListShapes($tenantId: ID!) {
             shape {
-              getMany {
+              getMany(tenantId: $tenantId) {
                 identifier
                 name
                 type
@@ -31,22 +31,31 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.pimApi(query);
-        const shapes = (data as {shape: {getMany: ShapeSummary[]}}).shape.getMany;
+        const data = await client.api.pimApi(query, {
+          tenantId: client.config.tenantId,
+        });
+        const shapes = (data as { shape: { getMany: ShapeSummary[] } }).shape
+          .getMany;
 
         if (!shapes?.length) {
           return {
-            content: [{type: 'text', text: 'No shapes found in this tenant.'}],
+            content: [
+              { type: 'text', text: 'No shapes found in this tenant.' },
+            ],
           };
         }
 
-        const lines: string[] = [`${shapes.length} shape(s) in tenant "${client.config.tenantIdentifier}":\n`];
+        const lines: string[] = [
+          `${shapes.length} shape(s) in tenant "${client.config.tenantIdentifier}":\n`,
+        ];
 
         for (const shape of shapes) {
           lines.push(`${shape.name} (${shape.identifier}) [${shape.type}]`);
           lines.push(`  Components: ${shape.components?.length ?? 0}`);
           if (shape.components?.length) {
-            const componentList = shape.components.map(c => `${c.id} (${c.type})`).join(', ');
+            const componentList = shape.components
+              .map(c => `${c.id} (${c.type})`)
+              .join(', ');
             lines.push(`  ${componentList}`);
           }
           lines.push(`  Link: ${client.shapeLink(shape.identifier)}`);
@@ -54,7 +63,7 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -64,15 +73,17 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
       description:
         'Get the full component definition for a shape. Shows all components with their types, descriptions, and configuration. Useful for understanding what data a shape expects.',
       schema: {
-        identifier: z.string().describe('Shape identifier, e.g. "product" or "blog-post"'),
+        identifier: z
+          .string()
+          .describe('Shape identifier, e.g. "product" or "blog-post"'),
       },
-      handler: async (params) => {
-        const {identifier} = params;
+      handler: async params => {
+        const { identifier } = params;
 
         const query = `
-          query GetShape($identifier: String!) {
+          query GetShape($identifier: String!, $tenantId: ID!) {
             shape {
-              get(identifier: $identifier) {
+              get(identifier: $identifier, tenantId: $tenantId) {
                 identifier
                 name
                 type
@@ -99,12 +110,21 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.pimApi(query, {identifier});
-        const shape = (data as {shape: {get: ShapeDetail | null}}).shape.get;
+        const data = await client.api.pimApi(query, {
+          identifier,
+          tenantId: client.config.tenantId,
+        });
+        const shape = (data as { shape: { get: ShapeDetail | null } }).shape
+          .get;
 
         if (!shape) {
           return {
-            content: [{type: 'text', text: `Shape "${identifier}" not found. Use list_shapes to see available shapes.`}],
+            content: [
+              {
+                type: 'text',
+                text: `Shape "${identifier}" not found. Use list_shapes to see available shapes.`,
+              },
+            ],
             isError: true,
           };
         }
@@ -137,7 +157,7 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -149,9 +169,9 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
       schema: {},
       handler: async () => {
         const query = `
-          query GetTenant {
+          query GetTenant($identifier: String!) {
             tenant {
-              get {
+              get(identifier: $identifier) {
                 id
                 identifier
                 name
@@ -168,8 +188,10 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.pimApi(query);
-        const tenant = (data as {tenant: {get: TenantInfo}}).tenant.get;
+        const data = await client.api.pimApi(query, {
+          identifier: client.config.tenantIdentifier,
+        });
+        const tenant = (data as { tenant: { get: TenantInfo } }).tenant.get;
 
         const lines: string[] = [
           `${tenant.name}`,
@@ -181,12 +203,14 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         ];
 
         if (tenant.availableLanguages?.length) {
-          const langs = tenant.availableLanguages.map(l => `${l.name} (${l.code})`).join(', ');
+          const langs = tenant.availableLanguages
+            .map(l => `${l.name} (${l.code})`)
+            .join(', ');
           lines.push(`  Languages: ${langs}`);
         }
 
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -199,7 +223,7 @@ interface ShapeSummary {
   identifier: string;
   name: string;
   type: string;
-  components?: {id: string; name: string; type: string}[];
+  components?: { id: string; name: string; type: string }[];
 }
 
 interface ShapeDetail extends ShapeSummary {
@@ -219,6 +243,6 @@ interface TenantInfo {
   id: string;
   identifier: string;
   name: string;
-  defaults?: {language?: string; currency?: string};
-  availableLanguages?: {code: string; name: string}[];
+  defaults?: { language?: string; currency?: string };
+  availableLanguages?: { code: string; name: string }[];
 }

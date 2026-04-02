@@ -2,9 +2,9 @@
  * Catalogue tools — browse, get items, search, and product variants.
  */
 
-import {z} from 'zod';
-import type {CrystallizeClient} from '../client.js';
-import type {ToolDefinition} from '../types.js';
+import { z } from 'zod';
+import type { CrystallizeClient } from '../client.js';
+import type { ToolDefinition } from '../types.js';
 
 export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
   return [
@@ -13,12 +13,18 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
       description:
         'Browse the catalogue tree by path. Returns child items (folders, products, documents) with names, paths, and types. Start with "/" to see the root.',
       schema: {
-        path: z.string().default('/').describe('Catalogue path to browse, e.g. "/" or "/shop/plants"'),
+        path: z
+          .string()
+          .default('/')
+          .describe('Catalogue path to browse, e.g. "/" or "/shop/plants"'),
         language: z.string().default('en').describe('Language code'),
-        depth: z.number().default(1).describe('How many levels deep to fetch children (1-3)'),
+        depth: z
+          .number()
+          .default(1)
+          .describe('How many levels deep to fetch children (1-3)'),
       },
-      handler: async (params) => {
-        const {path, language, depth} = params;
+      handler: async params => {
+        const { path, language, depth } = params;
         const clampedDepth = Math.min(Math.max(depth, 1), 3);
 
         const childrenFragment = buildChildrenFragment(clampedDepth);
@@ -34,19 +40,22 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.catalogueApi(query, {path, language});
-        const catalogue = (data as {catalogue: CatalogueNode | null}).catalogue;
+        const data = await client.api.catalogueApi(query, { path, language });
+        const catalogue = (data as { catalogue: CatalogueNode | null })
+          .catalogue;
 
         if (!catalogue) {
           return {
-            content: [{type: 'text', text: `No item found at path "${path}"`}],
+            content: [
+              { type: 'text', text: `No item found at path "${path}"` },
+            ],
             isError: true,
           };
         }
 
         const lines = formatCatalogueNode(catalogue, client, 0);
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -59,8 +68,8 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         path: z.string().describe('Item path, e.g. "/shop/plants/monstera"'),
         language: z.string().default('en').describe('Language code'),
       },
-      handler: async (params) => {
-        const {path, language} = params;
+      handler: async params => {
+        const { path, language } = params;
 
         const query = `
           query GetItem($path: String!, $language: String!) {
@@ -95,12 +104,14 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.catalogueApi(query, {path, language});
-        const item = (data as {catalogue: ItemNode | null}).catalogue;
+        const data = await client.api.catalogueApi(query, { path, language });
+        const item = (data as { catalogue: ItemNode | null }).catalogue;
 
         if (!item) {
           return {
-            content: [{type: 'text', text: `No item found at path "${path}"`}],
+            content: [
+              { type: 'text', text: `No item found at path "${path}"` },
+            ],
             isError: true,
           };
         }
@@ -117,12 +128,14 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         if (item.components?.length) {
           lines.push('', 'Components:');
           for (const comp of item.components) {
-            lines.push(`  ${comp.id} (${comp.type}): ${formatComponentContent(comp.content)}`);
+            lines.push(
+              `  ${comp.id} (${comp.type}): ${formatComponentContent(comp.content)}`,
+            );
           }
         }
 
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -140,8 +153,8 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         language: z.string().default('no').describe('Language code'),
         limit: z.number().default(20).describe('Max results to return'),
       },
-      handler: async (params) => {
-        const {term, type, language, limit} = params;
+      handler: async params => {
+        const { term, type, language, limit } = params;
 
         const typeFilter = type ? `, type: ${type}` : '';
         const query = `
@@ -166,17 +179,24 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           `https://api.crystallize.com/${client.config.tenantIdentifier}/search`,
           {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({query, variables: {term, language}}),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, variables: { term, language } }),
           },
         );
 
-        const json = (await response.json()) as {data?: {search?: {edges?: SearchEdge[]}}};
+        const json = (await response.json()) as {
+          data?: { search?: { edges?: SearchEdge[] } };
+        };
         const edges = (json.data?.search?.edges ?? []).slice(0, limit);
 
         if (edges.length === 0) {
           return {
-            content: [{type: 'text', text: `No results for "${term}"${type ? ` (type: ${type})` : ''}`}],
+            content: [
+              {
+                type: 'text',
+                text: `No results for "${term}"${type ? ` (type: ${type})` : ''}`,
+              },
+            ],
           };
         }
 
@@ -191,7 +211,12 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         });
 
         return {
-          content: [{type: 'text', text: `Search results for "${term}" (${edges.length} hits):\n\n${lines.join('\n\n')}`}],
+          content: [
+            {
+              type: 'text',
+              text: `Search results for "${term}" (${edges.length} hits):\n\n${lines.join('\n\n')}`,
+            },
+          ],
         };
       },
     },
@@ -204,8 +229,8 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         path: z.string().describe('Product path, e.g. "/shop/plants/monstera"'),
         language: z.string().default('en').describe('Language code'),
       },
-      handler: async (params) => {
-        const {path, language} = params;
+      handler: async params => {
+        const { path, language } = params;
 
         const query = `
           query GetVariants($path: String!, $language: String!) {
@@ -233,12 +258,14 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.catalogueApi(query, {path, language});
-        const product = (data as {catalogue: ProductNode | null}).catalogue;
+        const data = await client.api.catalogueApi(query, { path, language });
+        const product = (data as { catalogue: ProductNode | null }).catalogue;
 
         if (!product) {
           return {
-            content: [{type: 'text', text: `No product found at path "${path}"`}],
+            content: [
+              { type: 'text', text: `No product found at path "${path}"` },
+            ],
             isError: true,
           };
         }
@@ -246,7 +273,12 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         const variants = product.variants ?? [];
         if (variants.length === 0) {
           return {
-            content: [{type: 'text', text: `Product "${product.name}" has no variants.`}],
+            content: [
+              {
+                type: 'text',
+                text: `Product "${product.name}" has no variants.`,
+              },
+            ],
           };
         }
 
@@ -259,8 +291,12 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         for (const v of variants) {
           lines.push(`${v.isDefault ? '* ' : '  '}${v.name ?? v.sku}`);
           lines.push(`    SKU: ${v.sku}`);
-          if (v.price != null) {lines.push(`    Price: ${v.price}`);}
-          if (v.stock != null) {lines.push(`    Stock: ${v.stock}`);}
+          if (v.price != null) {
+            lines.push(`    Price: ${v.price}`);
+          }
+          if (v.stock != null) {
+            lines.push(`    Stock: ${v.stock}`);
+          }
           if (v.attributes?.length) {
             for (const attr of v.attributes) {
               lines.push(`    ${attr.attribute}: ${attr.value}`);
@@ -270,7 +306,7 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         return {
-          content: [{type: 'text', text: lines.join('\n')}],
+          content: [{ type: 'text', text: lines.join('\n') }],
         };
       },
     },
@@ -292,7 +328,7 @@ interface ItemNode {
   name: string;
   type: string;
   path: string;
-  shape?: {identifier: string; name: string};
+  shape?: { identifier: string; name: string };
   components?: ComponentNode[];
 }
 
@@ -324,14 +360,16 @@ interface VariantNode {
   isDefault?: boolean;
   price?: number;
   stock?: number;
-  attributes?: {attribute: string; value: string}[];
-  images?: {url: string; altText?: string}[];
+  attributes?: { attribute: string; value: string }[];
+  images?: { url: string; altText?: string }[];
 }
 
 // --- Helpers ---
 
 function buildChildrenFragment(depth: number): string {
-  if (depth <= 0) {return '';}
+  if (depth <= 0) {
+    return '';
+  }
   const inner = depth > 1 ? buildChildrenFragment(depth - 1) : '';
   return `children { id name type path ${inner} }`;
 }
@@ -357,22 +395,32 @@ function formatCatalogueNode(
   return lines;
 }
 
-function formatComponentContent(content: Record<string, unknown> | null): string {
-  if (!content) {return '(empty)';}
+function formatComponentContent(
+  content: Record<string, unknown> | null,
+): string {
+  if (!content) {
+    return '(empty)';
+  }
 
-  if ('text' in content) {return String(content.text);}
-  if ('plainText' in content) {return truncate(String(content.plainText), 200);}
-  if ('value' in content) {return String(content.value);}
+  if ('text' in content) {
+    return String(content.text);
+  }
+  if ('plainText' in content) {
+    return truncate(String(content.plainText), 200);
+  }
+  if ('value' in content) {
+    return String(content.value);
+  }
   if ('number' in content) {
     const unit = content.unit ? ` ${content.unit}` : '';
     return `${content.number}${unit}`;
   }
   if ('images' in content) {
-    const images = content.images as {url: string}[];
+    const images = content.images as { url: string }[];
     return `${images.length} image(s)`;
   }
   if ('options' in content) {
-    const options = content.options as {key: string; value: string}[];
+    const options = content.options as { key: string; value: string }[];
     return options.map(o => o.value).join(', ');
   }
 
@@ -380,6 +428,8 @@ function formatComponentContent(content: Record<string, unknown> | null): string
 }
 
 function truncate(text: string, max: number): string {
-  if (text.length <= max) {return text;}
+  if (text.length <= max) {
+    return text;
+  }
   return text.slice(0, max) + '...';
 }
