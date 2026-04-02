@@ -5,12 +5,12 @@
  * is a top-level field with its own filters, pagination, and fields.
  */
 
-import {z} from 'zod';
-import type {CrystallizeClient} from '../client.js';
-import type {ToolDefinition} from '../types.js';
+import { z } from 'zod';
+import type { CrystallizeClient } from '../client.js';
+import type { ToolDefinition } from '../types.js';
 
 /** Cache introspected schema per tenant to avoid repeated introspection. */
-let schemaCache: {shapes: ShapeInfo[]; timestamp: number} | null = null;
+let schemaCache: { shapes: ShapeInfo[]; timestamp: number } | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface ShapeInfo {
@@ -27,7 +27,9 @@ interface FieldInfo {
   isScalar: boolean;
 }
 
-async function introspectShapes(client: CrystallizeClient): Promise<ShapeInfo[]> {
+async function introspectShapes(
+  client: CrystallizeClient,
+): Promise<ShapeInfo[]> {
   if (schemaCache && Date.now() - schemaCache.timestamp < CACHE_TTL_MS) {
     return schemaCache.shapes;
   }
@@ -40,7 +42,14 @@ async function introspectShapes(client: CrystallizeClient): Promise<ShapeInfo[]>
         type { kind ofType { name kind } }
       }
     }
-  }`)) as {__type: {fields: {name: string; type: {kind: string; ofType: {name: string; kind: string}}}[]}};
+  }`)) as {
+    __type: {
+      fields: {
+        name: string;
+        type: { kind: string; ofType: { name: string; kind: string } };
+      }[];
+    };
+  };
 
   const shapeEntries = browseData.__type.fields;
 
@@ -53,18 +62,34 @@ async function introspectShapes(client: CrystallizeClient): Promise<ShapeInfo[]>
     )
     .join('\n');
 
-  const hitData = (await client.api.discoveryApi(`{ ${hitTypeQueries} }`)) as Record<
+  const hitData = (await client.api.discoveryApi(
+    `{ ${hitTypeQueries} }`,
+  )) as Record<
     string,
-    {fields: {name: string; type: {name: string | null; kind: string; ofType: {name: string | null; kind: string; ofType: {name: string | null} | null} | null}}[]} | null
+    {
+      fields: {
+        name: string;
+        type: {
+          name: string | null;
+          kind: string;
+          ofType: {
+            name: string | null;
+            kind: string;
+            ofType: { name: string | null } | null;
+          } | null;
+        };
+      }[];
+    } | null
   >;
 
   const shapes: ShapeInfo[] = shapeEntries.map((entry, i) => {
     const hitType = hitData[`s${i}`];
-    const fields: FieldInfo[] = (hitType?.fields ?? []).map((f) => {
+    const fields: FieldInfo[] = (hitType?.fields ?? []).map(f => {
       const t = f.type;
-      const typeName = t.name ?? t.ofType?.name ?? t.ofType?.ofType?.name ?? t.kind;
+      const typeName =
+        t.name ?? t.ofType?.name ?? t.ofType?.ofType?.name ?? t.kind;
       const isScalar = t.kind === 'SCALAR' || t.kind === 'ENUM';
-      return {name: f.name, typeName, kind: t.kind, isScalar};
+      return { name: f.name, typeName, kind: t.kind, isScalar };
     });
 
     return {
@@ -75,18 +100,24 @@ async function introspectShapes(client: CrystallizeClient): Promise<ShapeInfo[]>
     };
   });
 
-  schemaCache = {shapes, timestamp: Date.now()};
+  schemaCache = { shapes, timestamp: Date.now() };
   return shapes;
 }
 
 /** Get scalar fields for a shape that are useful for a summary view. */
 function getDefaultFields(shape: ShapeInfo): string[] {
   const always = ['name', 'path', 'itemId'];
-  const useful = ['externalReference', 'language', 'type', 'shape', 'publishedAt'];
-  const result = always.filter((f) => shape.fields.some((sf) => sf.name === f));
+  const useful = [
+    'externalReference',
+    'language',
+    'type',
+    'shape',
+    'publishedAt',
+  ];
+  const result = always.filter(f => shape.fields.some(sf => sf.name === f));
 
   for (const field of useful) {
-    if (shape.fields.some((sf) => sf.name === field && sf.isScalar)) {
+    if (shape.fields.some(sf => sf.name === field && sf.isScalar)) {
       result.push(field);
     }
   }
@@ -103,9 +134,11 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         verbose: z
           .boolean()
           .default(false)
-          .describe('If true, show all fields per shape. If false, show only shape names and field counts.'),
+          .describe(
+            'If true, show all fields per shape. If false, show only shape names and field counts.',
+          ),
       },
-      handler: async (params) => {
+      handler: async params => {
         const shapes = await introspectShapes(client);
 
         const lines: string[] = [
@@ -115,26 +148,30 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         for (const shape of shapes) {
           if (params.verbose) {
             lines.push(`${shape.name} (${shape.fields.length} fields)`);
-            const scalarFields = shape.fields.filter((f) => f.isScalar);
-            const objectFields = shape.fields.filter((f) => !f.isScalar);
+            const scalarFields = shape.fields.filter(f => f.isScalar);
+            const objectFields = shape.fields.filter(f => !f.isScalar);
 
             if (scalarFields.length > 0) {
-              lines.push(`  Scalar: ${scalarFields.map((f) => f.name).join(', ')}`);
+              lines.push(
+                `  Scalar: ${scalarFields.map(f => f.name).join(', ')}`,
+              );
             }
             if (objectFields.length > 0) {
               lines.push(
-                `  Objects: ${objectFields.map((f) => `${f.name} (${f.typeName})`).join(', ')}`,
+                `  Objects: ${objectFields.map(f => `${f.name} (${f.typeName})`).join(', ')}`,
               );
             }
             lines.push('');
           } else {
-            const scalarCount = shape.fields.filter((f) => f.isScalar).length;
-            const objectCount = shape.fields.filter((f) => !f.isScalar).length;
-            lines.push(`  ${shape.name} — ${scalarCount} scalar, ${objectCount} object fields`);
+            const scalarCount = shape.fields.filter(f => f.isScalar).length;
+            const objectCount = shape.fields.filter(f => !f.isScalar).length;
+            lines.push(
+              `  ${shape.name} — ${scalarCount} scalar, ${objectCount} object fields`,
+            );
           }
         }
 
-        return {content: [{type: 'text', text: lines.join('\n')}]};
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       },
     },
 
@@ -143,7 +180,11 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
       description:
         'Browse items of a specific shape using the Discovery API. Supports pagination, search terms, and selecting specific fields. Use list_discovery_shapes first to see available shapes and fields.',
       schema: {
-        shape: z.string().describe('Shape name to browse, e.g. "produktHageland", "hagesenter", "kategori"'),
+        shape: z
+          .string()
+          .describe(
+            'Shape name to browse, e.g. "produktHageland", "hagesenter", "kategori"',
+          ),
         fields: z
           .array(z.string())
           .optional()
@@ -156,16 +197,22 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
           .describe(
             'Fields to return on defaultVariant (for product shapes), e.g. ["sku", "name", "defaultPrice"]',
           ),
-        term: z.string().optional().describe('Search term to filter results within this shape'),
+        term: z
+          .string()
+          .optional()
+          .describe('Search term to filter results within this shape'),
         limit: z.number().default(10).describe('Number of results (max 100)'),
-        after: z.string().optional().describe('Pagination token from a previous result (endToken)'),
+        after: z
+          .string()
+          .optional()
+          .describe('Pagination token from a previous result (endToken)'),
       },
-      handler: async (params) => {
+      handler: async params => {
         const shapes = await introspectShapes(client);
-        const shape = shapes.find((s) => s.name === params.shape);
+        const shape = shapes.find(s => s.name === params.shape);
 
         if (!shape) {
-          const available = shapes.map((s) => s.name).join(', ');
+          const available = shapes.map(s => s.name).join(', ');
           return {
             content: [
               {
@@ -183,10 +230,10 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         const selectedFields = params.fields ?? getDefaultFields(shape);
         // Validate fields exist on shape
         const invalidFields = selectedFields.filter(
-          (f: string) => !shape.fields.some((sf) => sf.name === f),
+          (f: string) => !shape.fields.some(sf => sf.name === f),
         );
         if (invalidFields.length > 0) {
-          const available = shape.fields.map((f) => f.name).join(', ');
+          const available = shape.fields.map(f => f.name).join(', ');
           return {
             content: [
               {
@@ -201,14 +248,18 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         // Build variant fields if requested
         let variantSelection = '';
         if (params.variant_fields?.length) {
-          const hasVariants = shape.fields.some((f) => f.name === 'defaultVariant');
+          const hasVariants = shape.fields.some(
+            f => f.name === 'defaultVariant',
+          );
           if (hasVariants) {
             variantSelection = `defaultVariant { ${params.variant_fields.join(' ')} }`;
           }
         }
 
         // Build query args
-        const args: string[] = [`pagination: { limit: ${limit}${params.after ? `, after: "${params.after}"` : ''} }`];
+        const args: string[] = [
+          `pagination: { limit: ${limit}${params.after ? `, after: "${params.after}"` : ''} }`,
+        ];
         if (params.term) {
           args.push(`term: "${params.term.replace(/"/g, '\\"')}"`);
         }
@@ -226,19 +277,32 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         }`;
 
         const data = (await client.api.discoveryApi(query)) as {
-          browse: Record<string, {summary: Summary; hits: Record<string, unknown>[]}>;
+          browse: Record<
+            string,
+            { summary: Summary; hits: Record<string, unknown>[] }
+          >;
         };
 
         const result = data.browse[params.shape];
 
         if (!result?.hits?.length) {
           return {
-            content: [{type: 'text', text: `No results for shape "${params.shape}"${params.term ? ` with term "${params.term}"` : ''}`}],
+            content: [
+              {
+                type: 'text',
+                text: `No results for shape "${params.shape}"${params.term ? ` with term "${params.term}"` : ''}`,
+              },
+            ],
           };
         }
 
         return {
-          content: [{type: 'text', text: formatBrowseResult(params.shape, result, client)}],
+          content: [
+            {
+              type: 'text',
+              text: formatBrowseResult(params.shape, result, client),
+            },
+          ],
         };
       },
     },
@@ -250,14 +314,19 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
       schema: {
         shape: z.string().describe('Shape name, e.g. "produktHageland"'),
       },
-      handler: async (params) => {
+      handler: async params => {
         const shapes = await introspectShapes(client);
-        const shape = shapes.find((s) => s.name === params.shape);
+        const shape = shapes.find(s => s.name === params.shape);
 
         if (!shape) {
-          const available = shapes.map((s) => s.name).join(', ');
+          const available = shapes.map(s => s.name).join(', ');
           return {
-            content: [{type: 'text', text: `Shape "${params.shape}" not found.\n\nAvailable: ${available}`}],
+            content: [
+              {
+                type: 'text',
+                text: `Shape "${params.shape}" not found.\n\nAvailable: ${available}`,
+              },
+            ],
             isError: true,
           };
         }
@@ -274,7 +343,7 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
           lines.push(`  ${field.name}: ${field.typeName}${scalar}`);
         }
 
-        return {content: [{type: 'text', text: lines.join('\n')}]};
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       },
     },
   ];
@@ -292,10 +361,10 @@ interface Summary {
 
 function formatBrowseResult(
   shapeName: string,
-  result: {summary: Summary; hits: Record<string, unknown>[]},
+  result: { summary: Summary; hits: Record<string, unknown>[] },
   client: CrystallizeClient,
 ): string {
-  const {summary, hits} = result;
+  const { summary, hits } = result;
 
   const lines: string[] = [
     `${shapeName} — ${summary.totalHits} total, showing ${hits.length}`,
@@ -310,10 +379,18 @@ function formatBrowseResult(
 
     // Show all scalar fields except name (already shown)
     for (const [key, value] of Object.entries(hit)) {
-      if (key === 'name') {continue;}
-      if (value === null || value === undefined) {continue;}
+      if (key === 'name') {
+        continue;
+      }
+      if (value === null || value === undefined) {
+        continue;
+      }
 
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+      ) {
         lines.push(`  ${key}: ${value}`);
       } else if (typeof value === 'object') {
         lines.push(`  ${key}: ${JSON.stringify(value)}`);
@@ -327,7 +404,9 @@ function formatBrowseResult(
   }
 
   if (summary.hasMoreHits && summary.endToken) {
-    lines.push(`--- More results available. Use after: "${summary.endToken}" to paginate ---`);
+    lines.push(
+      `--- More results available. Use after: "${summary.endToken}" to paginate ---`,
+    );
   }
 
   return lines.join('\n');

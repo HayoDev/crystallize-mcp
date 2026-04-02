@@ -4,16 +4,18 @@
  * Provides headless commerce tools for AI agents via the Model Context Protocol.
  */
 
-import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import type {ZodRawShape} from 'zod';
-import {CrystallizeClient} from './client.js';
-import {formatError} from './errors.js';
-import type {AccessMode, ToolDefinition} from './types.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ZodRawShape } from 'zod';
+import { CrystallizeClient } from './client.js';
+import { formatError } from './errors.js';
+import type { AccessMode, ToolDefinition } from './types.js';
 
 // Tool groups
-import {catalogueTools} from './tools/catalogue.js';
-import {shapeTools} from './tools/shapes.js';
-import {discoveryTools} from './tools/discovery.js';
+import { catalogueTools } from './tools/catalogue.js';
+import { shapeTools } from './tools/shapes.js';
+import { discoveryTools } from './tools/discovery.js';
+import { orderTools } from './tools/orders.js';
+import { customerTools } from './tools/customers.js';
 
 /** Access mode hierarchy: read < write < admin. */
 const ACCESS_LEVELS: Record<AccessMode, number> = {
@@ -49,6 +51,8 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
     ...catalogueTools(crystallize),
     ...shapeTools(crystallize),
     ...discoveryTools(crystallize),
+    ...orderTools(crystallize),
+    ...customerTools(crystallize),
   ];
 
   // Register tools that match the current access mode
@@ -67,7 +71,7 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
           return await tool.handler(params);
         } catch (error) {
           return {
-            content: [{type: 'text' as const, text: formatError(error)}],
+            content: [{ type: 'text' as const, text: formatError(error) }],
             isError: true,
           };
         }
@@ -75,5 +79,5 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
     );
   }
 
-  return {server, client: crystallize};
+  return { server, client: crystallize };
 }

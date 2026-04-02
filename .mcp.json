@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "crystallize": {
+      "command": "node",
+      "args": [
+        "/Users/haniabuzeid/Projects/live-proj/mcp/crystallize-mcp/build/src/bin/crystallize-mcp.js"
+      ],
+      "env": {
+        "CRYSTALLIZE_TENANT_IDENTIFIER": "hageland-dev"
+      }
+    }
+  }
+}

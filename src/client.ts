@@ -6,9 +6,10 @@
  * - Consistent config from env vars
  */
 
-import {createClient} from '@crystallize/js-api-client';
-import type {ClientInterface} from '@crystallize/js-api-client';
-import type {CrystallizeConfig} from './types.js';
+import { createClient } from '@crystallize/js-api-client';
+import type { ClientInterface } from '@crystallize/js-api-client';
+import { readCredentials } from './credentials.js';
+import type { CrystallizeConfig } from './types.js';
 
 export class CrystallizeClient {
   public readonly api: ClientInterface;
@@ -40,7 +41,63 @@ export class CrystallizeClient {
     return `https://app.crystallize.com/${this.config.tenantIdentifier}/en/orders/${orderId}`;
   }
 
-  /** Build config from environment variables. */
+  /**
+   * Build config from env vars, falling back to OS keychain for credentials.
+   * Use this in the server binary. Use fromEnv() in tests.
+   */
+  static async fromEnvOrKeychain(): Promise<CrystallizeClient> {
+    const tenantIdentifier = process.env.CRYSTALLIZE_TENANT_IDENTIFIER;
+    if (!tenantIdentifier) {
+      throw new Error(
+        'CRYSTALLIZE_TENANT_IDENTIFIER is required.\n' +
+          'Set it in your environment or MCP client config.',
+      );
+    }
+
+    const accessMode = (process.env.CRYSTALLIZE_ACCESS_MODE ??
+      'read') as CrystallizeConfig['accessMode'];
+    if (!['read', 'write', 'admin'].includes(accessMode)) {
+      throw new Error(
+        `Invalid CRYSTALLIZE_ACCESS_MODE: "${accessMode}". Must be "read", "write", or "admin".`,
+      );
+    }
+
+    // Env vars take priority; fall back to keychain for secrets only
+    let accessTokenId = process.env.CRYSTALLIZE_ACCESS_TOKEN_ID;
+    let accessTokenSecret = process.env.CRYSTALLIZE_ACCESS_TOKEN_SECRET;
+    let staticAuthToken = process.env.CRYSTALLIZE_STATIC_AUTH_TOKEN;
+
+    if (!accessTokenId && !staticAuthToken) {
+      const stored = await readCredentials();
+      accessTokenId = stored.accessTokenId;
+      accessTokenSecret = stored.accessTokenSecret;
+      staticAuthToken = stored.staticAuthToken;
+    }
+
+    const client = new CrystallizeClient({
+      tenantIdentifier,
+      tenantId: process.env.CRYSTALLIZE_TENANT_ID,
+      accessTokenId,
+      accessTokenSecret,
+      staticAuthToken,
+      accessMode,
+    });
+
+    // Bootstrap tenant ID if not provided — fetch from PIM API using the identifier
+    if (!client.config.tenantId) {
+      const data = (await client.api.pimApi(
+        `query GetTenantId($identifier: String!) {
+          tenant { get(identifier: $identifier) { id } }
+        }`,
+        { identifier: tenantIdentifier },
+      )) as { tenant: { get: { id: string } } };
+      client.config.tenantId = data.tenant.get.id;
+    }
+
+    return client;
+  }
+
+  /** Build config from environment variables only. */
   static fromEnv(): CrystallizeClient {
     const tenantIdentifier = process.env.CRYSTALLIZE_TENANT_IDENTIFIER;
     if (!tenantIdentifier) {

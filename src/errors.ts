@@ -28,12 +28,22 @@ export function formatError(error: unknown): string {
   let message: string;
   if (error instanceof Error) {
     message = error.message;
-  } else if (
-    typeof error === 'object' &&
-    error !== null &&
-    'message' in error
-  ) {
-    message = String((error as { message: unknown }).message);
+  } else if (typeof error === 'object' && error !== null) {
+    const obj = error as Record<string, unknown>;
+    // GraphQL errors array: { errors: [{ message: "..." }] }
+    if (
+      Array.isArray(obj.errors) &&
+      obj.errors.length > 0 &&
+      typeof (obj.errors[0] as Record<string, unknown>).message === 'string'
+    ) {
+      message = (obj.errors as { message: string }[])
+        .map(e => e.message)
+        .join('; ');
+    } else if ('message' in obj) {
+      message = String(obj.message);
+    } else {
+      message = JSON.stringify(error);
+    }
   } else {
     message = String(error);
   }

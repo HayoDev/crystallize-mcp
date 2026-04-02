@@ -5,8 +5,9 @@
  *
  * Usage:
  *   crystallize-mcp              Start the MCP server (stdio transport)
- *   crystallize-mcp --setup      Interactive setup for Claude Code (.mcp.json)
+ *   crystallize-mcp --setup           Interactive setup for Claude Code (.mcp.json)
  *   crystallize-mcp --setup --global  Setup for Claude Desktop
+ *   crystallize-mcp --setup --local   Setup pointing at local build (for development)
  */
 
 // Handle --setup before importing heavy deps
@@ -23,10 +24,13 @@ if (process.argv.includes('--setup')) {
 }
 
 async function startServer() {
-  const {StdioServerTransport} = await import('@modelcontextprotocol/sdk/server/stdio.js');
-  const {createCrystallizeMcpServer} = await import('../index.js');
+  const { StdioServerTransport } =
+    await import('@modelcontextprotocol/sdk/server/stdio.js');
+  const { createCrystallizeMcpServer } = await import('../index.js');
+  const { CrystallizeClient } = await import('../client.js');
 
-  const {server, client} = createCrystallizeMcpServer();
+  const crystallize = await CrystallizeClient.fromEnvOrKeychain();
+  const { server, client } = createCrystallizeMcpServer(crystallize);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

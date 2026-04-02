@@ -2,13 +2,16 @@
  * Shared types for crystallize-mcp.
  */
 
-import type {z, ZodRawShape} from 'zod';
+import type { z, ZodRawShape } from 'zod';
 
 /** Access mode controls which tools are registered. */
 export type AccessMode = 'read' | 'write' | 'admin';
 
 /** MCP tool result content block. */
-export interface TextContent {type: 'text'; text: string}
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
 
 /** MCP tool result — uses index signature to satisfy MCP SDK. */
 export interface ToolResult {
@@ -38,4 +41,10 @@ export interface CrystallizeConfig {
 }
 
 /** Error categories for actionable error messages. */
-export type ErrorCategory = 'auth' | 'not_found' | 'rate_limit' | 'permission' | 'validation' | 'unknown';
+export type ErrorCategory =
+  | 'auth'
+  | 'not_found'
+  | 'rate_limit'
+  | 'permission'
+  | 'validation'
+  | 'unknown';
