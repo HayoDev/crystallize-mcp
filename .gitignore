@@ -10,9 +10,10 @@ dist/
 *.log
 npm-debug.log*
 
-# Environment
+# Environment & local MCP config (contains tenant identifiers / tokens)
 .env
 .env.*
+.mcp.json
 
 # MCP Registry
 .mcpregistry_*
