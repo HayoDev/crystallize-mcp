@@ -41,7 +41,8 @@ export interface CrystallizeConfig {
   accessTokenSecret?: string;
   staticAuthToken?: string;
   accessMode: AccessMode;
-  piiMode: PiiMode;
+  defaultLanguage?: string;
+  piiMode?: PiiMode;
   auditLog?: string;
 }
 

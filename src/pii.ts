@@ -5,7 +5,8 @@
  * configured CRYSTALLIZE_PII_MODE.
  */
 
-export type PiiMode = 'full' | 'masked' | 'none';
+import type { PiiMode } from './types.js';
+export type { PiiMode };
 
 /** Mask an email: `hani@example.com` → `h***@example.com` */
 export function maskEmail(email: string): string {
@@ -16,7 +17,7 @@ export function maskEmail(email: string): string {
   return `${local[0]}***@${domain}`;
 }
 
-/** Mask a phone number: `+4747601264` → `+47 ***-***-1264` */
+/** Mask a phone number: keeps only last 4 digits → `***-1264` */
 export function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 4) {

@@ -9,7 +9,12 @@
 import { createClient } from '@crystallize/js-api-client';
 import type { ClientInterface } from '@crystallize/js-api-client';
 import { readCredentials } from './credentials.js';
+import { homedir } from 'node:os';
 import type { CrystallizeConfig, PiiMode } from './types.js';
+
+function expandPath(p: string): string {
+  return p.startsWith('~/') ? `${homedir()}/${p.slice(2)}` : p;
+}
 
 function parsePiiMode(): PiiMode {
   const raw = process.env.CRYSTALLIZE_PII_MODE ?? 'full';
@@ -26,7 +31,7 @@ export class CrystallizeClient {
   public readonly config: CrystallizeConfig;
 
   constructor(config: CrystallizeConfig) {
-    this.config = config;
+    this.config = { piiMode: 'full', ...config };
     this.api = createClient({
       tenantIdentifier: config.tenantIdentifier,
       tenantId: config.tenantId,
@@ -37,18 +42,21 @@ export class CrystallizeClient {
   }
 
   /** Generate a deep link to an item in the Crystallize UI. */
-  itemLink(itemId: string, type = 'document', language = 'no'): string {
-    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${language}/catalogue/${type}/${itemId}`;
+  itemLink(itemId: string, type = 'document', language?: string): string {
+    const lang = language ?? this.config.defaultLanguage ?? 'en';
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/catalogue/${type}/${itemId}`;
   }
 
   /** Generate a deep link to a shape in the Crystallize UI. */
-  shapeLink(shapeIdentifier: string): string {
-    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/no/settings/shapes/${shapeIdentifier}`;
+  shapeLink(shapeIdentifier: string, language?: string): string {
+    const lang = language ?? this.config.defaultLanguage ?? 'en';
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/settings/shapes/${shapeIdentifier}`;
   }
 
   /** Generate a deep link to an order in the Crystallize UI. */
-  orderLink(orderId: string): string {
-    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/no/orders/${orderId}`;
+  orderLink(orderId: string, language?: string): string {
+    const lang = language ?? this.config.defaultLanguage ?? 'en';
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/orders/${orderId}`;
   }
 
   /**
@@ -92,18 +100,24 @@ export class CrystallizeClient {
       staticAuthToken,
       accessMode,
       piiMode: parsePiiMode(),
-      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG,
+      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG
+        ? expandPath(process.env.CRYSTALLIZE_AUDIT_LOG)
+        : undefined,
     });
 
-    // Bootstrap tenant ID if not provided — fetch from PIM API using the identifier
-    if (!client.config.tenantId) {
+    // Bootstrap tenant ID and default language from PIM API
+    if (!client.config.tenantId || !client.config.defaultLanguage) {
       const data = (await client.api.pimApi(
-        `query GetTenantId($identifier: String!) {
-          tenant { get(identifier: $identifier) { id } }
+        `query GetTenantMeta($identifier: String!) {
+          tenant { get(identifier: $identifier) { id defaults { language } } }
         }`,
         { identifier: tenantIdentifier },
-      )) as { tenant: { get: { id: string } } };
-      client.config.tenantId = data.tenant.get.id;
+      )) as {
+        tenant: { get: { id: string; defaults?: { language?: string } } };
+      };
+      client.config.tenantId ??= data.tenant.get.id;
+      client.config.defaultLanguage ??=
+        data.tenant.get.defaults?.language ?? 'en';
     }
 
     return client;
@@ -135,7 +149,9 @@ export class CrystallizeClient {
       staticAuthToken: process.env.CRYSTALLIZE_STATIC_AUTH_TOKEN,
       accessMode,
       piiMode: parsePiiMode(),
-      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG,
+      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG
+        ? expandPath(process.env.CRYSTALLIZE_AUDIT_LOG)
+        : undefined,
     });
   }
 }

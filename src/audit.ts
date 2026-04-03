@@ -11,37 +11,38 @@ export interface AuditEntry {
   ts: string;
   tool: string;
   params: Record<string, unknown>;
-  result: string;
+  result: 'ok' | 'error';
   tenant: string;
 }
 
 export class AuditLogger {
   private readonly path: string;
+  private enabled = true;
 
   constructor(path: string) {
     this.path = path;
-    mkdirSync(dirname(path), { recursive: true });
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+    } catch {
+      // Audit logging should never crash the server
+      this.enabled = false;
+    }
   }
 
   log(entry: AuditEntry): void {
+    if (!this.enabled) {
+      return;
+    }
     try {
       appendFileSync(this.path, JSON.stringify(entry) + '\n');
     } catch {
       // Audit logging should never crash the server
+      this.enabled = false;
     }
   }
 }
 
-/** Summarise a tool result into a short string for the audit log. */
-export function summariseResult(result: {
-  content: { text: string }[];
-  isError?: boolean;
-}): string {
-  if (result.isError) {
-    return 'error';
-  }
-  const text = result.content[0]?.text ?? '';
-  // Extract the first line, capped at 80 chars
-  const firstLine = text.split('\n')[0] ?? '';
-  return firstLine.length > 80 ? firstLine.slice(0, 77) + '...' : firstLine;
+/** Return a non-content status string for the audit log. */
+export function summariseResult(result: { isError?: boolean }): 'ok' | 'error' {
+  return result.isError ? 'error' : 'ok';
 }

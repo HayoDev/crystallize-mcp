@@ -214,15 +214,15 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 ### Environment variables
 
-| Variable                          | Required | Description                                                                      |
-| --------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                       |
-| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                      |
-| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                       |
-| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                |
-| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered      |
-| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses |
-| `CRYSTALLIZE_AUDIT_LOG`           | No       | Absolute path to write an audit log (e.g. `~/.crystallize-mcp/audit.log`)        |
+| Variable                          | Required | Description                                                                        |
+| --------------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                         |
+| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                        |
+| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                         |
+| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                  |
+| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered        |
+| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses   |
+| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`) |
 
 ### PII mode (opt-in)
 
@@ -277,9 +277,11 @@ Note: CLI-based MCP clients (`claude mcp add`, Cursor, Copilot, etc.) store env 
 
 Every response includes clickable links to the Crystallize UI:
 
-- Items → `app.crystallize.com/{tenant}/en/catalogue/{itemId}`
-- Shapes → `app.crystallize.com/{tenant}/en/shapes/{identifier}`
-- Orders → `app.crystallize.com/{tenant}/en/orders/{orderId}`
+- Items → `app.crystallize.com/@{tenant}/{language}/catalogue/{type}/{itemId}`
+- Shapes → `app.crystallize.com/@{tenant}/{language}/settings/shapes/{identifier}`
+- Orders → `app.crystallize.com/@{tenant}/{language}/orders/{orderId}`
+
+The language segment is automatically set from the tenant's default language, bootstrapped at server startup — no configuration needed. Tools that accept a `language` parameter (catalogue, search) use the requested language in both the API call and the generated link.
 
 ## Development
 

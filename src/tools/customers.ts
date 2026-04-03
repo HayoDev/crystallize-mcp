@@ -12,7 +12,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'list_customers',
       description:
-        'Search and list customers in the tenant. Supports filtering by name or email. Returns identifiers, names, emails, and company names.',
+        'Search and list customers in the tenant. Supports filtering by name or email. Returned fields depend on CRYSTALLIZE_PII_MODE: full (default) returns all contact data, masked returns partial email/phone and city+country only, none returns identifiers only.',
       schema: {
         searchTerm: z
           .string()
