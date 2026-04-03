@@ -277,19 +277,21 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           }
         }
 
-        if (customer.externalReferences?.length) {
-          lines.push('');
-          lines.push('External references:');
-          for (const ref of customer.externalReferences) {
-            lines.push(`  ${ref.key}: ${ref.value ?? ''}`);
+        if (pii !== 'none') {
+          if (customer.externalReferences?.length) {
+            lines.push('');
+            lines.push('External references:');
+            for (const ref of customer.externalReferences) {
+              lines.push(`  ${ref.key}: ${ref.value ?? ''}`);
+            }
           }
-        }
 
-        if (customer.meta?.length) {
-          lines.push('');
-          lines.push('Meta:');
-          for (const m of customer.meta) {
-            lines.push(`  ${m.key}: ${m.value ?? ''}`);
+          if (customer.meta?.length) {
+            lines.push('');
+            lines.push('Meta:');
+            for (const m of customer.meta) {
+              lines.push(`  ${m.key}: ${m.value ?? ''}`);
+            }
           }
         }
 

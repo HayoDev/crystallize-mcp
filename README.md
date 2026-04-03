@@ -228,11 +228,11 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 By default all customer and order data is returned as-is (`full`). Set `CRYSTALLIZE_PII_MODE` to opt in to data minimisation:
 
-| Mode     | Behaviour                                                                         |
-| -------- | --------------------------------------------------------------------------------- |
-| `full`   | Default — all fields returned unchanged                                           |
-| `masked` | Emails → `h***@example.com`, phones → `***-1234`, addresses → city + country only |
-| `none`   | Contact data stripped entirely — identifiers, dates, and totals only              |
+| Mode     | Behaviour                                                                                                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`   | Default — all fields returned unchanged                                                                                                                                            |
+| `masked` | Emails → `h***@example.com`, phones → `***-1234`, addresses → city + country only                                                                                                  |
+| `none`   | Contact/PII fields stripped — names, emails, phones, addresses, meta, and external references removed. Non-contact data (order lines, payment types, totals) may still be present. |
 
 Applies to `list_customers`, `get_customer`, `list_orders`, and `get_order`. No effect on catalogue or shape tools.
 
@@ -252,7 +252,11 @@ Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured loggin
 }
 ```
 
-One JSON line per call — timestamp, tool name, sanitised params, result summary, and tenant. Response content is never logged. Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk).
+One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Response content is never logged.
+
+> **Note:** Params are logged as-is and may contain PII — for example, a `searchTerm` of `hani@example.com` or a `customerIdentifier`. Treat the audit log file as sensitive data and restrict access accordingly. Param scrubbing is on the roadmap but not yet implemented.
+
+Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk) — but ensure your pipeline handles the file with appropriate access controls.
 
 ### Keychain storage (optional)
 

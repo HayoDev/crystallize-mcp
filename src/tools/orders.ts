@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { CrystallizeClient } from '../client.js';
 import type { ToolDefinition } from '../types.js';
+import { maskEmail } from '../pii.js';
 
 export function orderTools(client: CrystallizeClient): ToolDefinition[] {
   return [
@@ -90,12 +91,17 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         const total = result.pageInfo.totalNodes ?? orders.length;
+        const pii = client.config.piiMode;
+
+        const displayIdentifier =
+          pii === 'none' && customerIdentifier.includes('@')
+            ? maskEmail(customerIdentifier)
+            : customerIdentifier;
+
         const lines: string[] = [
-          `Orders for "${customerIdentifier}" (${orders.length} of ${total}):`,
+          `Orders for "${displayIdentifier}" (${orders.length} of ${total}):`,
           '',
         ];
-
-        const pii = client.config.piiMode;
 
         for (const order of orders) {
           lines.push(`Order ${order.id}`);

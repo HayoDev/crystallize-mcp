@@ -47,14 +47,14 @@ export function maskAddress<T>(addr: T): T {
 
 /**
  * Apply PII masking to a flat object with known field names.
- * Mutates nothing — returns a new object.
+ * Always returns a new object — never mutates the original.
  */
 export function maskFields<T extends Record<string, unknown>>(
   obj: T,
   mode: PiiMode,
 ): T {
   if (mode === 'full') {
-    return obj;
+    return { ...obj };
   }
 
   const result = { ...obj };
