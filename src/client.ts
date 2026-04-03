@@ -10,10 +10,11 @@ import { createClient } from '@crystallize/js-api-client';
 import type { ClientInterface } from '@crystallize/js-api-client';
 import { readCredentials } from './credentials.js';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { CrystallizeConfig, PiiMode } from './types.js';
 
 function expandPath(p: string): string {
-  return p.startsWith('~/') ? `${homedir()}/${p.slice(2)}` : p;
+  return p.startsWith('~/') ? join(homedir(), p.slice(2)) : p;
 }
 
 function parsePiiMode(): PiiMode {

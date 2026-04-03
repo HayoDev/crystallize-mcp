@@ -12,7 +12,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'list_customers',
       description:
-        'Search and list customers in the tenant. Supports filtering by name or email. Returned fields depend on CRYSTALLIZE_PII_MODE: full (default) returns all contact data, masked returns partial email/phone and city+country only, none returns identifiers only.',
+        'Search and list customers in the tenant. Supports filtering by name or email. Returned fields depend on CRYSTALLIZE_PII_MODE: full (default) returns name, identifier, email, company, and phone; masked returns name, identifier, company, and masked email/phone; none returns identifiers only.',
       schema: {
         searchTerm: z
           .string()
@@ -100,11 +100,15 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
         const pii = client.config.piiMode;
 
         for (const c of customers) {
+          const maskedId =
+            pii !== 'full' && c.identifier.includes('@')
+              ? maskEmail(c.identifier)
+              : c.identifier;
           if (pii === 'none') {
-            lines.push(`${c.identifier}`);
+            lines.push(`${maskedId}`);
           } else {
             const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
-            lines.push(`${name || c.identifier} (${c.identifier})`);
+            lines.push(`${name || maskedId} (${maskedId})`);
             if (c.email) {
               lines.push(
                 `  Email: ${pii === 'masked' ? maskEmail(c.email) : c.email}`,
@@ -203,7 +207,12 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
 
         const pii = client.config.piiMode;
 
-        const lines: string[] = [`  Identifier: ${customer.identifier}`];
+        const maskedId =
+          pii !== 'full' && customer.identifier.includes('@')
+            ? maskEmail(customer.identifier)
+            : customer.identifier;
+
+        const lines: string[] = [`  Identifier: ${maskedId}`];
 
         if (pii !== 'none') {
           const name = [customer.firstName, customer.lastName]
@@ -212,7 +221,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           if (name) {
             lines.unshift(name);
           } else {
-            lines.unshift(customer.identifier);
+            lines.unshift(maskedId);
           }
 
           if (customer.email) {
@@ -235,7 +244,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
             lines.push(`  Birth date: ${customer.birthDate}`);
           }
         } else {
-          lines.unshift(customer.identifier);
+          lines.unshift(maskedId);
         }
 
         if (pii !== 'none' && customer.addresses?.length) {

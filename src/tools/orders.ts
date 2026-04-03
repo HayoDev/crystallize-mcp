@@ -94,7 +94,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         const pii = client.config.piiMode;
 
         const displayIdentifier =
-          pii === 'none' && customerIdentifier.includes('@')
+          pii !== 'full' && customerIdentifier.includes('@')
             ? maskEmail(customerIdentifier)
             : customerIdentifier;
 
@@ -211,11 +211,15 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         if (order.customer) {
           const c = order.customer;
           lines.push('');
+          const maskedId =
+            pii !== 'full' && c.identifier.includes('@')
+              ? maskEmail(c.identifier)
+              : c.identifier;
           if (pii === 'none') {
-            lines.push(`Customer: ${c.identifier}`);
+            lines.push(`Customer: ${maskedId}`);
           } else {
             const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
-            lines.push(`Customer: ${name || c.identifier} (${c.identifier})`);
+            lines.push(`Customer: ${name || maskedId} (${maskedId})`);
             for (const addr of c.addresses ?? []) {
               if (pii === 'masked') {
                 const addrStr = [addr.city, addr.country]
