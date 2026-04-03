@@ -9,7 +9,17 @@
 import { createClient } from '@crystallize/js-api-client';
 import type { ClientInterface } from '@crystallize/js-api-client';
 import { readCredentials } from './credentials.js';
-import type { CrystallizeConfig } from './types.js';
+import type { CrystallizeConfig, PiiMode } from './types.js';
+
+function parsePiiMode(): PiiMode {
+  const raw = process.env.CRYSTALLIZE_PII_MODE ?? 'full';
+  if (!['full', 'masked', 'none'].includes(raw)) {
+    throw new Error(
+      `Invalid CRYSTALLIZE_PII_MODE: "${raw}". Must be "full", "masked", or "none".`,
+    );
+  }
+  return raw as PiiMode;
+}
 
 export class CrystallizeClient {
   public readonly api: ClientInterface;
@@ -27,18 +37,18 @@ export class CrystallizeClient {
   }
 
   /** Generate a deep link to an item in the Crystallize UI. */
-  itemLink(itemId: string, language = 'en'): string {
-    return `https://app.crystallize.com/${this.config.tenantIdentifier}/${language}/catalogue/${itemId}`;
+  itemLink(itemId: string, type = 'document', language = 'no'): string {
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${language}/catalogue/${type}/${itemId}`;
   }
 
   /** Generate a deep link to a shape in the Crystallize UI. */
   shapeLink(shapeIdentifier: string): string {
-    return `https://app.crystallize.com/${this.config.tenantIdentifier}/en/shapes/${shapeIdentifier}`;
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/no/settings/shapes/${shapeIdentifier}`;
   }
 
   /** Generate a deep link to an order in the Crystallize UI. */
   orderLink(orderId: string): string {
-    return `https://app.crystallize.com/${this.config.tenantIdentifier}/en/orders/${orderId}`;
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/no/orders/${orderId}`;
   }
 
   /**
@@ -81,6 +91,8 @@ export class CrystallizeClient {
       accessTokenSecret,
       staticAuthToken,
       accessMode,
+      piiMode: parsePiiMode(),
+      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG,
     });
 
     // Bootstrap tenant ID if not provided — fetch from PIM API using the identifier
@@ -122,6 +134,8 @@ export class CrystallizeClient {
       accessTokenSecret: process.env.CRYSTALLIZE_ACCESS_TOKEN_SECRET,
       staticAuthToken: process.env.CRYSTALLIZE_STATIC_AUTH_TOKEN,
       accessMode,
+      piiMode: parsePiiMode(),
+      auditLog: process.env.CRYSTALLIZE_AUDIT_LOG,
     });
   }
 }

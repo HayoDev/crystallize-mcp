@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { CrystallizeClient } from '../client.js';
 import type { ToolDefinition } from '../types.js';
+import { maskEmail, maskPhone } from '../pii.js';
 
 export function customerTools(client: CrystallizeClient): ToolDefinition[] {
   return [
@@ -96,17 +97,27 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           '',
         ];
 
+        const pii = client.config.piiMode;
+
         for (const c of customers) {
-          const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
-          lines.push(`${name || c.identifier} (${c.identifier})`);
-          if (c.email) {
-            lines.push(`  Email: ${c.email}`);
-          }
-          if (c.companyName) {
-            lines.push(`  Company: ${c.companyName}`);
-          }
-          if (c.phone) {
-            lines.push(`  Phone: ${c.phone}`);
+          if (pii === 'none') {
+            lines.push(`${c.identifier}`);
+          } else {
+            const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
+            lines.push(`${name || c.identifier} (${c.identifier})`);
+            if (c.email) {
+              lines.push(
+                `  Email: ${pii === 'masked' ? maskEmail(c.email) : c.email}`,
+              );
+            }
+            if (c.companyName) {
+              lines.push(`  Company: ${c.companyName}`);
+            }
+            if (c.phone) {
+              lines.push(
+                `  Phone: ${pii === 'masked' ? maskPhone(c.phone) : c.phone}`,
+              );
+            }
           }
           lines.push('');
         }
@@ -190,58 +201,78 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           };
         }
 
-        const name = [customer.firstName, customer.lastName]
-          .filter(Boolean)
-          .join(' ');
+        const pii = client.config.piiMode;
 
-        const lines: string[] = [
-          `${name || customer.identifier}`,
-          `  Identifier: ${customer.identifier}`,
-        ];
+        const lines: string[] = [`  Identifier: ${customer.identifier}`];
 
-        if (customer.email) {
-          lines.push(`  Email: ${customer.email}`);
-        }
-        if (customer.phone) {
-          lines.push(`  Phone: ${customer.phone}`);
-        }
-        if (customer.companyName) {
-          lines.push(`  Company: ${customer.companyName}`);
-        }
-        if (customer.taxNumber) {
-          lines.push(`  Tax number: ${customer.taxNumber}`);
-        }
-        if (customer.birthDate) {
-          lines.push(`  Birth date: ${customer.birthDate}`);
+        if (pii !== 'none') {
+          const name = [customer.firstName, customer.lastName]
+            .filter(Boolean)
+            .join(' ');
+          if (name) {
+            lines.unshift(name);
+          } else {
+            lines.unshift(customer.identifier);
+          }
+
+          if (customer.email) {
+            lines.push(
+              `  Email: ${pii === 'masked' ? maskEmail(customer.email) : customer.email}`,
+            );
+          }
+          if (customer.phone) {
+            lines.push(
+              `  Phone: ${pii === 'masked' ? maskPhone(customer.phone) : customer.phone}`,
+            );
+          }
+          if (customer.companyName) {
+            lines.push(`  Company: ${customer.companyName}`);
+          }
+          if (customer.taxNumber) {
+            lines.push(`  Tax number: ${customer.taxNumber}`);
+          }
+          if (customer.birthDate) {
+            lines.push(`  Birth date: ${customer.birthDate}`);
+          }
+        } else {
+          lines.unshift(customer.identifier);
         }
 
-        if (customer.addresses?.length) {
+        if (pii !== 'none' && customer.addresses?.length) {
           lines.push('');
           lines.push(`Addresses (${customer.addresses.length}):`);
           for (const addr of customer.addresses) {
-            const addrName = [addr.firstName, addr.lastName]
-              .filter(Boolean)
-              .join(' ');
-            const addrStr = [
-              addr.streetNumber,
-              addr.street,
-              addr.street2,
-              addr.city,
-              addr.state,
-              addr.postalCode,
-              addr.country,
-            ]
-              .filter(Boolean)
-              .join(', ');
-            lines.push(`  [${addr.type}] ${addrName}`);
-            if (addrStr) {
-              lines.push(`    ${addrStr}`);
-            }
-            if (addr.email) {
-              lines.push(`    Email: ${addr.email}`);
-            }
-            if (addr.phone) {
-              lines.push(`    Phone: ${addr.phone}`);
+            if (pii === 'masked') {
+              // City + country only
+              const addrStr = [addr.city, addr.country]
+                .filter(Boolean)
+                .join(', ');
+              lines.push(`  [${addr.type}] ${addrStr || '(masked)'}`);
+            } else {
+              const addrName = [addr.firstName, addr.lastName]
+                .filter(Boolean)
+                .join(' ');
+              const addrStr = [
+                addr.streetNumber,
+                addr.street,
+                addr.street2,
+                addr.city,
+                addr.state,
+                addr.postalCode,
+                addr.country,
+              ]
+                .filter(Boolean)
+                .join(', ');
+              lines.push(`  [${addr.type}] ${addrName}`);
+              if (addrStr) {
+                lines.push(`    ${addrStr}`);
+              }
+              if (addr.email) {
+                lines.push(`    Email: ${addr.email}`);
+              }
+              if (addr.phone) {
+                lines.push(`    Phone: ${addr.phone}`);
+              }
             }
           }
         }

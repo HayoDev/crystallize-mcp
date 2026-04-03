@@ -398,7 +398,8 @@ function formatBrowseResult(
     }
 
     if (itemId) {
-      lines.push(`  Link: ${client.itemLink(itemId)}`);
+      const itemType = (hit.type as string) ?? 'document';
+      lines.push(`  Link: ${client.itemLink(itemId, itemType)}`);
     }
     lines.push('');
   }

@@ -8,6 +8,7 @@ describe('createCrystallizeMcpServer', () => {
     const client = new CrystallizeClient({
       tenantIdentifier: 'test-tenant',
       accessMode: 'read',
+      piiMode: 'full',
     });
 
     const result = createCrystallizeMcpServer(client);
@@ -24,19 +25,24 @@ describe('CrystallizeClient', () => {
     const client = new CrystallizeClient({
       tenantIdentifier: 'hageland',
       accessMode: 'read',
+      piiMode: 'full',
     });
 
     assert.strictEqual(
       client.itemLink('abc123'),
-      'https://app.crystallize.com/hageland/en/catalogue/abc123',
+      'https://app.crystallize.com/@hageland/no/catalogue/document/abc123',
+    );
+    assert.strictEqual(
+      client.itemLink('abc123', 'product'),
+      'https://app.crystallize.com/@hageland/no/catalogue/product/abc123',
     );
     assert.strictEqual(
       client.shapeLink('product'),
-      'https://app.crystallize.com/hageland/en/shapes/product',
+      'https://app.crystallize.com/@hageland/no/settings/shapes/product',
     );
     assert.strictEqual(
       client.orderLink('order-456'),
-      'https://app.crystallize.com/hageland/en/orders/order-456',
+      'https://app.crystallize.com/@hageland/no/orders/order-456',
     );
   });
 
@@ -44,11 +50,12 @@ describe('CrystallizeClient', () => {
     const client = new CrystallizeClient({
       tenantIdentifier: 'hageland',
       accessMode: 'read',
+      piiMode: 'full',
     });
 
     assert.strictEqual(
-      client.itemLink('abc123', 'no'),
-      'https://app.crystallize.com/hageland/no/catalogue/abc123',
+      client.itemLink('abc123', 'document', 'en'),
+      'https://app.crystallize.com/@hageland/en/catalogue/document/abc123',
     );
   });
 });

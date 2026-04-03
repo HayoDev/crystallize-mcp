@@ -95,14 +95,18 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
           '',
         ];
 
+        const pii = client.config.piiMode;
+
         for (const order of orders) {
-          const name = [order.customer?.firstName, order.customer?.lastName]
-            .filter(Boolean)
-            .join(' ');
           lines.push(`Order ${order.id}`);
           lines.push(`  Created: ${order.createdAt}`);
-          if (name) {
-            lines.push(`  Customer: ${name}`);
+          if (pii !== 'none') {
+            const name = [order.customer?.firstName, order.customer?.lastName]
+              .filter(Boolean)
+              .join(' ');
+            if (name) {
+              lines.push(`  Customer: ${name}`);
+            }
           }
           if (order.total) {
             lines.push(
@@ -171,7 +175,8 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
                   tax { name percent }
                 }
                 payment {
-                  provider
+                  __typename
+                  ... on CustomPayment { provider }
                 }
               }
             }
@@ -195,21 +200,34 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
           `  Link: ${client.orderLink(order.id)}`,
         ];
 
+        const pii = client.config.piiMode;
+
         if (order.customer) {
           const c = order.customer;
-          const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
           lines.push('');
-          lines.push(`Customer: ${name || c.identifier} (${c.identifier})`);
-          for (const addr of c.addresses ?? []) {
-            const addrStr = [addr.street, addr.city, addr.country]
-              .filter(Boolean)
-              .join(', ');
-            lines.push(`  ${addr.type}: ${addrStr}`);
-            if (addr.email) {
-              lines.push(`    Email: ${addr.email}`);
-            }
-            if (addr.phone) {
-              lines.push(`    Phone: ${addr.phone}`);
+          if (pii === 'none') {
+            lines.push(`Customer: ${c.identifier}`);
+          } else {
+            const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
+            lines.push(`Customer: ${name || c.identifier} (${c.identifier})`);
+            for (const addr of c.addresses ?? []) {
+              if (pii === 'masked') {
+                const addrStr = [addr.city, addr.country]
+                  .filter(Boolean)
+                  .join(', ');
+                lines.push(`  ${addr.type}: ${addrStr || '(masked)'}`);
+              } else {
+                const addrStr = [addr.street, addr.city, addr.country]
+                  .filter(Boolean)
+                  .join(', ');
+                lines.push(`  ${addr.type}: ${addrStr}`);
+                if (addr.email) {
+                  lines.push(`    Email: ${addr.email}`);
+                }
+                if (addr.phone) {
+                  lines.push(`    Phone: ${addr.phone}`);
+                }
+              }
             }
           }
         }
@@ -241,7 +259,9 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         if (order.payment?.length) {
-          const providers = order.payment.map(p => p.provider).join(', ');
+          const providers = order.payment
+            .map(p => p.provider ?? p.__typename ?? 'unknown')
+            .join(', ');
           lines.push('');
           lines.push(`Payment: ${providers}`);
         }
@@ -304,7 +324,7 @@ interface OrderDetail extends OrderSummary {
     currency: string;
     tax?: { name: string; percent: number };
   };
-  payment?: { provider: string }[];
+  payment?: { provider?: string; __typename?: string }[];
 }
 
 interface OrdersListResponse {

@@ -214,13 +214,45 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 ### Environment variables
 
-| Variable                          | Required | Description                                                                 |
-| --------------------------------- | -------- | --------------------------------------------------------------------------- |
-| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                  |
-| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                 |
-| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                  |
-| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                           |
-| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered |
+| Variable                          | Required | Description                                                                      |
+| --------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                       |
+| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                      |
+| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                       |
+| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                |
+| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered      |
+| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses |
+| `CRYSTALLIZE_AUDIT_LOG`           | No       | Absolute path to write an audit log (e.g. `~/.crystallize-mcp/audit.log`)        |
+
+### PII mode (opt-in)
+
+By default all customer and order data is returned as-is (`full`). Set `CRYSTALLIZE_PII_MODE` to opt in to data minimisation:
+
+| Mode     | Behaviour                                                                         |
+| -------- | --------------------------------------------------------------------------------- |
+| `full`   | Default — all fields returned unchanged                                           |
+| `masked` | Emails → `h***@example.com`, phones → `***-1234`, addresses → city + country only |
+| `none`   | Contact data stripped entirely — identifiers, dates, and totals only              |
+
+Applies to `list_customers`, `get_customer`, `list_orders`, and `get_order`. No effect on catalogue or shape tools.
+
+Relevant for teams handling real customer data, GDPR Article 25 compliance (data minimisation by design), or environments where the AI doesn't need raw contact details to do its job. A common pattern is `masked` on production and `full` on dev.
+
+### Audit log (opt-in)
+
+Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured logging of every tool call:
+
+```json
+{
+  "ts": "2026-04-03T14:38:41Z",
+  "tool": "list_customers",
+  "params": { "first": 10 },
+  "result": "Customers (10 of 18):",
+  "tenant": "hageland-prod"
+}
+```
+
+One JSON line per call — timestamp, tool name, sanitised params, result summary, and tenant. Response content is never logged. Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk).
 
 ### Keychain storage (optional)
 
