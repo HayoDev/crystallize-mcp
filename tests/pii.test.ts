@@ -131,9 +131,12 @@ describe('summariseResult', () => {
     assert.strictEqual(summariseResult({ isError: true }), 'error');
   });
 
-  it('does not include response content in result', () => {
-    const result = summariseResult({});
-    assert.strictEqual(result, 'ok');
-    assert.strictEqual(result.includes('hani'), false);
+  it('returns only ok/error regardless of result payload', () => {
+    const okResult = summariseResult({});
+    const errorResult = summariseResult({ isError: true });
+    assert.ok(['ok', 'error'].includes(okResult));
+    assert.ok(['ok', 'error'].includes(errorResult));
+    assert.strictEqual(okResult, 'ok');
+    assert.strictEqual(errorResult, 'error');
   });
 });
