@@ -8,6 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ZodRawShape } from 'zod';
 import { CrystallizeClient } from './client.js';
 import { formatError } from './errors.js';
+import { AuditLogger, summariseResult } from './audit.js';
 import type { AccessMode, ToolDefinition } from './types.js';
 
 // Tool groups
@@ -55,6 +56,11 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
     ...customerTools(crystallize),
   ];
 
+  // Audit logger — only active if CRYSTALLIZE_AUDIT_LOG is set
+  const audit = crystallize.config.auditLog
+    ? new AuditLogger(crystallize.config.auditLog)
+    : null;
+
   // Register tools that match the current access mode
   for (const tool of allTools) {
     const requiredMode = tool.mode ?? 'read';
@@ -68,12 +74,28 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
       tool.schema as Record<string, ZodRawShape[string]>,
       async (params: Record<string, unknown>) => {
         try {
-          return await tool.handler(params);
+          const result = await tool.handler(params);
+          audit?.log({
+            ts: new Date().toISOString(),
+            tool: tool.name,
+            params,
+            result: summariseResult(result),
+            tenant: crystallize.config.tenantIdentifier,
+          });
+          return result;
         } catch (error) {
-          return {
+          const errorResult = {
             content: [{ type: 'text' as const, text: formatError(error) }],
             isError: true,
           };
+          audit?.log({
+            ts: new Date().toISOString(),
+            tool: tool.name,
+            params,
+            result: 'error',
+            tenant: crystallize.config.tenantIdentifier,
+          });
+          return errorResult;
         }
       },
     );

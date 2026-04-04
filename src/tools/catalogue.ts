@@ -53,7 +53,7 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           };
         }
 
-        const lines = formatCatalogueNode(catalogue, client, 0);
+        const lines = formatCatalogueNode(catalogue, client, 0, language);
         return {
           content: [{ type: 'text', text: lines.join('\n') }],
         };
@@ -121,8 +121,8 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           `  Type: ${item.type}`,
           `  Path: ${item.path}`,
           `  Shape: ${item.shape?.name ?? 'unknown'} (${item.shape?.identifier ?? '?'})`,
-          `  Link: ${client.itemLink(item.id)}`,
-          `  Shape link: ${item.shape ? client.shapeLink(item.shape.identifier) : 'n/a'}`,
+          `  Link: ${client.itemLink(item.id, item.type, language)}`,
+          `  Shape link: ${item.shape ? client.shapeLink(item.shape.identifier, language) : 'n/a'}`,
         ];
 
         if (item.components?.length) {
@@ -205,7 +205,7 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           const parts = [
             `${i + 1}. ${node.name} [${node.type}]`,
             `   Path: ${node.path}`,
-            `   Link: ${client.itemLink(node.id, language)}`,
+            `   Link: ${client.itemLink(node.id, node.type, language)}`,
           ];
           return parts.join('\n');
         });
@@ -284,7 +284,7 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
 
         const lines: string[] = [
           `${product.name} — ${variants.length} variant(s)`,
-          `Link: ${client.itemLink(product.id)}`,
+          `Link: ${client.itemLink(product.id, 'product', language)}`,
           '',
         ];
 
@@ -378,17 +378,18 @@ function formatCatalogueNode(
   node: CatalogueNode,
   client: CrystallizeClient,
   indent: number,
+  language = 'en',
 ): string[] {
   const prefix = '  '.repeat(indent);
   const lines: string[] = [
     `${prefix}${node.name} [${node.type}]`,
     `${prefix}  Path: ${node.path}`,
-    `${prefix}  Link: ${client.itemLink(node.id)}`,
+    `${prefix}  Link: ${client.itemLink(node.id, node.type, language)}`,
   ];
 
   if (node.children?.length) {
     for (const child of node.children) {
-      lines.push(...formatCatalogueNode(child, client, indent + 1));
+      lines.push(...formatCatalogueNode(child, client, indent + 1, language));
     }
   }
 
