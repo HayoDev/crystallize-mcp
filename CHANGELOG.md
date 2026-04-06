@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.2...crystallize-mcp-v0.1.3) (2026-04-06)
+
+
+### Bug Fixes
+
+* add mcpName field required by MCP registry ([#6](https://github.com/HayoDev/crystallize-mcp/issues/6)) ([69fcc28](https://github.com/HayoDev/crystallize-mcp/commit/69fcc28b3652919284609504058c8de3b4f2f368))
+
 ## [0.1.2](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.1...crystallize-mcp-v0.1.2) (2026-04-06)
 
 
