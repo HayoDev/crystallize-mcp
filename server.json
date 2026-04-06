@@ -12,7 +12,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "crystallize-mcp",
+      "identifier": "@hayodev/crystallize-mcp",
       "version": "0.0.0",
       "runtimeHint": "npx",
       "transport": {

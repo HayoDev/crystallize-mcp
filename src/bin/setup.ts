@@ -149,7 +149,7 @@ async function main() {
       }
     : {
         command: 'npx',
-        args: ['-y', 'crystallize-mcp@latest'],
+        args: ['-y', '@hayodev/crystallize-mcp@latest'],
         env,
       };
 

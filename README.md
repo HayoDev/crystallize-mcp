@@ -1,9 +1,9 @@
 # Crystallize MCP
 
-[![npm version](https://img.shields.io/npm/v/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
-[![license](https://img.shields.io/npm/l/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
-[![node](https://img.shields.io/node/v/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
+[![npm version](https://img.shields.io/npm/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
+[![license](https://img.shields.io/npm/l/@hayodev/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
+[![node](https://img.shields.io/node/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
 
 MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI.
 
@@ -18,7 +18,7 @@ Standard MCP config (works in any client):
   "mcpServers": {
     "crystallize": {
       "command": "npx",
-      "args": ["-y", "crystallize-mcp@latest"],
+      "args": ["-y", "@hayodev/crystallize-mcp@latest"],
       "env": {
         "CRYSTALLIZE_TENANT_IDENTIFIER": "your-tenant"
       }
@@ -37,7 +37,7 @@ claude mcp add crystallize \
   -e CRYSTALLIZE_TENANT_IDENTIFIER=your-tenant \
   -e CRYSTALLIZE_ACCESS_TOKEN_ID=your-token-id \
   -e CRYSTALLIZE_ACCESS_TOKEN_SECRET=your-token-secret \
-  -- npx -y crystallize-mcp@latest
+  -- npx -y @hayodev/crystallize-mcp@latest
 ```
 
 Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scope user` for personal use across all projects.
@@ -45,7 +45,7 @@ Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scop
 Or run the guided setup wizard, which can optionally store tokens in the OS keychain instead of plain text:
 
 ```bash
-npx crystallize-mcp --setup
+npx @hayodev/crystallize-mcp --setup
 ```
 
 </details>
@@ -56,7 +56,7 @@ npx crystallize-mcp --setup
 Run the guided wizard — it writes directly to `claude_desktop_config.json` and can store tokens in the macOS Keychain so they never appear in the config file:
 
 ```bash
-npx crystallize-mcp --setup --global
+npx @hayodev/crystallize-mcp --setup --global
 ```
 
 Or add the standard config manually to `~/Library/Application Support/Claude/claude_desktop_config.json`.
@@ -80,7 +80,7 @@ Add the standard config to `.vscode/mcp.json` in your project root.
   "servers": {
     "crystallize": {
       "command": "npx",
-      "args": ["-y", "crystallize-mcp@latest"],
+      "args": ["-y", "@hayodev/crystallize-mcp@latest"],
       "env": {
         "CRYSTALLIZE_TENANT_IDENTIFIER": "your-tenant",
         "CRYSTALLIZE_ACCESS_TOKEN_ID": "your-token-id",
@@ -127,7 +127,7 @@ Add the standard config to `~/.warp/mcp.json`.
 Open "Install MCP Server" in Raycast and fill in:
 
 - **Command**: `npx`
-- **Arguments**: `-y crystallize-mcp@latest`
+- **Arguments**: `-y @hayodev/crystallize-mcp@latest`
 - **Environment**: add `CRYSTALLIZE_TENANT_IDENTIFIER` and your token vars
 
 Or copy the standard config JSON above before opening the command — Raycast will auto-fill the form.
@@ -260,7 +260,7 @@ Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk) — but ensure y
 
 ### Keychain storage (optional)
 
-The setup wizard (`npx crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
+The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
 
 - **Claude Desktop users** — config is written to a JSON file with no CLI equivalent for secret management
 - **Shared `.mcp.json`** — when your project config is committed to git, keychain storage keeps tokens out of the repository
