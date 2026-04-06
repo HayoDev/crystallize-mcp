@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.1...crystallize-mcp-v0.1.2) (2026-04-06)
+
+
+### Bug Fixes
+
+* shorten server.json description to meet MCP registry 100-char limit ([#4](https://github.com/HayoDev/crystallize-mcp/issues/4)) ([afd475e](https://github.com/HayoDev/crystallize-mcp/commit/afd475ea2d2ea80316f0e7edd31323afb424f7bc))
+
 ## [0.1.1](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.0...crystallize-mcp-v0.1.1) (2026-04-06)
 
 
