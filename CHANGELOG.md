@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.3...crystallize-mcp-v0.1.4) (2026-04-07)
+
+
+### Bug Fixes
+
+* docs examples and tests ([#8](https://github.com/HayoDev/crystallize-mcp/issues/8)) ([4346dda](https://github.com/HayoDev/crystallize-mcp/commit/4346ddac07a1439313d970814f291677243099b9))
+
 ## [0.1.3](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.2...crystallize-mcp-v0.1.3) (2026-04-06)
 
 
