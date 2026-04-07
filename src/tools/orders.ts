@@ -16,6 +16,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
       schema: {
         customerIdentifier: z
           .string()
+          .min(1)
           .optional()
           .describe(
             'Customer identifier (email or unique ID) — omit to list all orders',
@@ -29,12 +30,14 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
       handler: async params => {
         const { customerIdentifier, first, after } = params;
 
-        const customerArg = customerIdentifier
-          ? `, customerIdentifier: $customerIdentifier`
-          : '';
-        const customerVarDecl = customerIdentifier
-          ? `, $customerIdentifier: String`
-          : '';
+        const customerArg =
+          customerIdentifier !== undefined
+            ? `, customerIdentifier: $customerIdentifier`
+            : '';
+        const customerVarDecl =
+          customerIdentifier !== undefined
+            ? `, $customerIdentifier: String`
+            : '';
         const query = `
           query ListOrders($first: Int, $after: String${customerVarDecl}) {
             orders {
