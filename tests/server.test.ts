@@ -22,45 +22,45 @@ describe('createCrystallizeMcpServer', () => {
 describe('CrystallizeClient', () => {
   it('should generate correct deep links', () => {
     const client = new CrystallizeClient({
-      tenantIdentifier: 'hageland',
+      tenantIdentifier: 'my-store',
       accessMode: 'read',
     });
 
     assert.strictEqual(
       client.itemLink('abc123'),
-      'https://app.crystallize.com/@hageland/en/catalogue/document/abc123',
+      'https://app.crystallize.com/@my-store/en/catalogue/document/abc123',
     );
     assert.strictEqual(
       client.itemLink('abc123', 'product'),
-      'https://app.crystallize.com/@hageland/en/catalogue/product/abc123',
+      'https://app.crystallize.com/@my-store/en/catalogue/product/abc123',
     );
     assert.strictEqual(
       client.shapeLink('my-shape'),
-      'https://app.crystallize.com/@hageland/en/settings/shapes/my-shape',
+      'https://app.crystallize.com/@my-store/en/settings/shapes/my-shape',
     );
     assert.strictEqual(
       client.orderLink('order-456'),
-      'https://app.crystallize.com/@hageland/en/orders/order-456',
+      'https://app.crystallize.com/@my-store/en/orders/order-456',
     );
   });
 
   it('should respect language parameter in links', () => {
     const client = new CrystallizeClient({
-      tenantIdentifier: 'hageland',
+      tenantIdentifier: 'my-store',
       accessMode: 'read',
     });
 
     assert.strictEqual(
       client.itemLink('abc123', 'document', 'no'),
-      'https://app.crystallize.com/@hageland/no/catalogue/document/abc123',
+      'https://app.crystallize.com/@my-store/no/catalogue/document/abc123',
     );
     assert.strictEqual(
       client.shapeLink('my-shape', 'no'),
-      'https://app.crystallize.com/@hageland/no/settings/shapes/my-shape',
+      'https://app.crystallize.com/@my-store/no/settings/shapes/my-shape',
     );
     assert.strictEqual(
       client.orderLink('order-456', 'no'),
-      'https://app.crystallize.com/@hageland/no/orders/order-456',
+      'https://app.crystallize.com/@my-store/no/orders/order-456',
     );
   });
 });

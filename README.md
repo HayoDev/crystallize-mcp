@@ -248,7 +248,7 @@ Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured loggin
   "tool": "list_customers",
   "params": { "first": 10 },
   "result": "ok",
-  "tenant": "hageland-prod"
+  "tenant": "my-store"
 }
 ```
 
