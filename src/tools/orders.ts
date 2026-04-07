@@ -12,11 +12,14 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'list_orders',
       description:
-        'List orders for a customer by their identifier. Returns order IDs, dates, totals, and deep links to the Crystallize UI. Supports pagination.',
+        'List orders, optionally filtered by customer identifier. Omit customerIdentifier to list all orders. Returns order IDs, dates, totals, and deep links to the Crystallize UI. Supports pagination.',
       schema: {
         customerIdentifier: z
           .string()
-          .describe('Customer identifier (email or unique ID)'),
+          .optional()
+          .describe(
+            'Customer identifier (email or unique ID) — omit to list all orders',
+          ),
         first: z.number().default(20).describe('Max orders to return'),
         after: z
           .string()
@@ -26,11 +29,16 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
       handler: async params => {
         const { customerIdentifier, first, after } = params;
 
-        const afterArg = after ? `, after: "${after}"` : '';
+        const customerArg = customerIdentifier
+          ? `, customerIdentifier: $customerIdentifier`
+          : '';
+        const customerVarDecl = customerIdentifier
+          ? `, $customerIdentifier: String`
+          : '';
         const query = `
-          query ListOrders($customerIdentifier: String!, $first: Int) {
+          query ListOrders($first: Int, $after: String${customerVarDecl}) {
             orders {
-              getAll(customerIdentifier: $customerIdentifier, first: $first${afterArg}) {
+              getAll(first: $first, after: $after${customerArg}) {
                 pageInfo {
                   hasNextPage
                   hasPreviousPage
@@ -63,6 +71,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         const data = await client.api.orderApi(query, {
           customerIdentifier,
           first,
+          after: after ?? null,
         });
         const result = (data as OrdersListResponse).orders?.getAll;
 
@@ -71,7 +80,9 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
             content: [
               {
                 type: 'text',
-                text: `No orders found for customer "${customerIdentifier}"`,
+                text: customerIdentifier
+                  ? `No orders found for customer "${customerIdentifier}"`
+                  : 'No orders found.',
               },
             ],
           };
@@ -84,7 +95,9 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
             content: [
               {
                 type: 'text',
-                text: `No orders found for customer "${customerIdentifier}"`,
+                text: customerIdentifier
+                  ? `No orders found for customer "${customerIdentifier}"`
+                  : 'No orders found.',
               },
             ],
           };
@@ -93,13 +106,19 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         const total = result.pageInfo.totalNodes ?? orders.length;
         const pii = client.config.piiMode;
 
-        const displayIdentifier =
-          pii !== 'full' && customerIdentifier.includes('@')
-            ? maskEmail(customerIdentifier)
-            : customerIdentifier;
+        let displayIdentifier = customerIdentifier;
+        if (
+          customerIdentifier &&
+          pii !== 'full' &&
+          customerIdentifier.includes('@')
+        ) {
+          displayIdentifier = maskEmail(customerIdentifier);
+        }
 
         const lines: string[] = [
-          `Orders for "${displayIdentifier}" (${orders.length} of ${total}):`,
+          displayIdentifier
+            ? `Orders for "${displayIdentifier}" (${orders.length} of ${total}):`
+            : `Orders (${orders.length} of ${total}):`,
           '',
         ];
 

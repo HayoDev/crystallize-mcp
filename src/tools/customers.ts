@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import type { CrystallizeClient } from '../client.js';
-import type { ToolDefinition } from '../types.js';
+import type { ToolDefinition, ToolResult, PiiMode } from '../types.js';
 import { maskEmail, maskPhone } from '../pii.js';
 
 export function customerTools(client: CrystallizeClient): ToolDefinition[] {
@@ -27,26 +27,21 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
       handler: async params => {
         const { searchTerm, first, after } = params;
 
-        const filterArg = searchTerm
-          ? `, filter: { searchTerm: "${searchTerm}" }`
-          : '';
-        const afterArg = after ? `, after: "${after}"` : '';
-
         const query = `
-          query ListCustomers($tenantId: ID!, $first: Int) {
+          query ListCustomers($tenantId: ID!, $first: Int, $after: String) {
             customer {
               getMany(
                 tenantId: $tenantId
-                first: $first${afterArg}${filterArg}
+                first: $first
+                after: $after
               ) {
                 pageInfo {
                   hasNextPage
-                  hasPreviousPage
-                  startCursor
                   endCursor
                   totalNodes
                 }
                 edges {
+                  cursor
                   node {
                     identifier
                     firstName
@@ -61,78 +56,107 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           }
         `;
 
-        const data = await client.api.pimApi(query, {
-          tenantId: client.config.tenantId,
-          first,
-        });
-        const result = (data as CustomerListResponse).customer?.getMany;
+        // Without a search term, do a single paginated fetch.
+        if (!searchTerm) {
+          const data = await client.api.pimApi(query, {
+            tenantId: client.config.tenantId,
+            first,
+            after: after ?? null,
+          });
+          const result = (data as CustomerListResponse).customer?.getMany;
 
-        if (!result) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `No customers found${searchTerm ? ` matching "${searchTerm}"` : ''}.`,
-              },
-            ],
-          };
+          if (!result || result.edges.length === 0) {
+            return {
+              content: [{ type: 'text', text: 'No customers found.' }],
+            };
+          }
+
+          return formatCustomerPage(
+            result.edges.map(e => e.node),
+            result.pageInfo.totalNodes ?? result.edges.length,
+            result.pageInfo.hasNextPage ? result.pageInfo.endCursor : undefined,
+            client.config.piiMode ?? 'full',
+          );
         }
 
-        const customers = result.edges.map(e => e.node);
+        // With a search term the API has no server-side filter, so we paginate
+        // through all pages in batches and filter client-side. We collect
+        // first+1 matches so we can tell whether a next page exists, and use
+        // per-edge cursors so the returned cursor always points to the exact
+        // last matched item (not the end of a raw batch).
+        const BATCH = 100;
+        const normalize = (s: string) =>
+          s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // strip combining diacritics
+            .replace(/[łŁ]/g, 'l')
+            .replace(/[øØ]/g, 'o')
+            .replace(/[æÆ]/g, 'ae')
+            .replace(/[œŒ]/g, 'oe')
+            .replace(/[ðÐ]/g, 'd')
+            .replace(/[þÞ]/g, 'th')
+            .replace(/ß/g, 'ss')
+            .toLowerCase();
+        const term = normalize(searchTerm);
+        const matchedEdges: { node: CustomerSummary; cursor: string }[] = [];
+        let currentAfter: string | null = after ?? null;
+        let hasMore = true;
 
-        if (customers.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `No customers found${searchTerm ? ` matching "${searchTerm}"` : ''}.`,
-              },
-            ],
-          };
-        }
+        while (hasMore && matchedEdges.length < first + 1) {
+          const data = await client.api.pimApi(query, {
+            tenantId: client.config.tenantId,
+            first: BATCH,
+            after: currentAfter,
+          });
+          const batch = (data as CustomerListResponse).customer?.getMany;
+          if (!batch) {
+            break;
+          }
 
-        const total = result.pageInfo.totalNodes ?? customers.length;
-        const lines: string[] = [
-          `Customers (${customers.length} of ${total}):`,
-          '',
-        ];
-
-        const pii = client.config.piiMode;
-
-        for (const c of customers) {
-          const maskedId =
-            pii !== 'full' && c.identifier.includes('@')
-              ? maskEmail(c.identifier)
-              : c.identifier;
-          if (pii === 'none') {
-            lines.push(`${maskedId}`);
-          } else {
-            const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
-            lines.push(`${name || maskedId} (${maskedId})`);
-            if (c.email) {
-              lines.push(
-                `  Email: ${pii === 'masked' ? maskEmail(c.email) : c.email}`,
-              );
-            }
-            if (c.companyName) {
-              lines.push(`  Company: ${c.companyName}`);
-            }
-            if (c.phone) {
-              lines.push(
-                `  Phone: ${pii === 'masked' ? maskPhone(c.phone) : c.phone}`,
+          for (const edge of batch.edges) {
+            const c = edge.node;
+            const name = normalize(
+              [c.firstName, c.lastName].filter(Boolean).join(' '),
+            );
+            if (
+              name.includes(term) ||
+              (c.email && normalize(c.email).includes(term)) ||
+              normalize(c.identifier).includes(term)
+            ) {
+              matchedEdges.push(
+                edge as { node: CustomerSummary; cursor: string },
               );
             }
           }
-          lines.push('');
+
+          hasMore = batch.pageInfo.hasNextPage ?? false;
+          currentAfter = batch.pageInfo.endCursor ?? null;
         }
 
-        if (result.pageInfo.hasNextPage && result.pageInfo.endCursor) {
-          lines.push(`Next page cursor: ${result.pageInfo.endCursor}`);
+        if (matchedEdges.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `No customers found matching "${searchTerm}".`,
+              },
+            ],
+          };
         }
 
-        return {
-          content: [{ type: 'text', text: lines.join('\n') }],
-        };
+        const page = matchedEdges.slice(0, first);
+        const nextCursor =
+          matchedEdges.length > first
+            ? matchedEdges[first - 1].cursor
+            : undefined;
+
+        return formatCustomerPage(
+          page.map(e => e.node),
+          undefined, // total unknown when filtering client-side
+          nextCursor,
+          client.config.piiMode ?? 'full',
+          searchTerm,
+        );
       },
     },
 
@@ -310,6 +334,55 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
       },
     },
   ];
+}
+
+// --- Helpers ---
+
+function formatCustomerPage(
+  customers: CustomerSummary[],
+  total: number | undefined,
+  nextCursor: string | undefined,
+  pii: PiiMode,
+  searchTerm?: string,
+): ToolResult {
+  const header = searchTerm
+    ? `Customers matching "${searchTerm}" (${customers.length}${total !== undefined ? ` of ${total}` : ''}):`
+    : `Customers (${customers.length}${total !== undefined ? ` of ${total}` : ''}):`;
+
+  const lines: string[] = [header, ''];
+
+  for (const c of customers) {
+    const maskedId =
+      pii !== 'full' && c.identifier.includes('@')
+        ? maskEmail(c.identifier)
+        : c.identifier;
+    if (pii === 'none') {
+      lines.push(maskedId);
+    } else {
+      const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
+      lines.push(`${name || maskedId} (${maskedId})`);
+      if (c.email) {
+        lines.push(
+          `  Email: ${pii === 'masked' ? maskEmail(c.email) : c.email}`,
+        );
+      }
+      if (c.companyName) {
+        lines.push(`  Company: ${c.companyName}`);
+      }
+      if (c.phone) {
+        lines.push(
+          `  Phone: ${pii === 'masked' ? maskPhone(c.phone) : c.phone}`,
+        );
+      }
+    }
+    lines.push('');
+  }
+
+  if (nextCursor) {
+    lines.push(`Next page cursor: ${nextCursor}`);
+  }
+
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
 }
 
 // --- Internal types ---
