@@ -183,7 +183,7 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
         shape: z
           .string()
           .describe(
-            'Shape name to browse, e.g. "produktHageland", "hagesenter", "kategori"',
+            'Shape name to browse, e.g. "product", "category", "article"',
           ),
         fields: z
           .array(z.string())
@@ -312,7 +312,7 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
       description:
         'Get detailed field information for a specific shape in the Discovery API. Shows all scalar and object fields with their types.',
       schema: {
-        shape: z.string().describe('Shape name, e.g. "produktHageland"'),
+        shape: z.string().describe('Shape name, e.g. "product"'),
       },
       handler: async params => {
         const shapes = await introspectShapes(client);
