@@ -9,6 +9,7 @@ import type { ZodRawShape } from 'zod';
 import { CrystallizeClient } from './client.js';
 import { formatError } from './errors.js';
 import { AuditLogger, summariseResult } from './audit.js';
+import type { MutationMeta } from './audit.js';
 import { VERSION } from './version.js';
 import type { AccessMode, ToolDefinition } from './types.js';
 
@@ -18,6 +19,7 @@ import { shapeTools } from './tools/shapes.js';
 import { discoveryTools } from './tools/discovery.js';
 import { orderTools } from './tools/orders.js';
 import { customerTools } from './tools/customers.js';
+import { contentTools } from './tools/content.js';
 
 /** Access mode hierarchy: read < write < admin. */
 const ACCESS_LEVELS: Record<AccessMode, number> = {
@@ -55,6 +57,7 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
     ...discoveryTools(crystallize),
     ...orderTools(crystallize),
     ...customerTools(crystallize),
+    ...contentTools(crystallize),
   ];
 
   // Audit logger — only active if CRYSTALLIZE_AUDIT_LOG is set
@@ -76,12 +79,17 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
       async (params: Record<string, unknown>) => {
         try {
           const result = await tool.handler(params);
+          const mutation =
+            'mutation' in result
+              ? (result.mutation as MutationMeta)
+              : undefined;
           audit?.log({
             ts: new Date().toISOString(),
             tool: tool.name,
             params,
             result: summariseResult(result),
             tenant: crystallize.config.tenantIdentifier,
+            mutation,
           });
           return result;
         } catch (error) {
