@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.5...crystallize-mcp-v0.1.6) (2026-04-08)
+
+
+### 🛠️ Fixes
+
+* sync version across all manifest files ([#13](https://github.com/HayoDev/crystallize-mcp/issues/13)) ([034773f](https://github.com/HayoDev/crystallize-mcp/commit/034773f7599dc2efa2f2e8fa047864c47deea4ac))
+
 ## [0.1.5](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.4...crystallize-mcp-v0.1.5) (2026-04-08)
 
 
