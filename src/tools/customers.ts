@@ -12,12 +12,8 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'list_customers',
       description:
-        'Search and list customers in the tenant. Supports filtering by name or email. Returned fields depend on CRYSTALLIZE_PII_MODE: full (default) returns name, identifier, email, company, and phone; masked returns name, identifier, company, and masked email/phone; none returns identifiers only.',
+        'List customers in the tenant with pagination. Returned fields depend on CRYSTALLIZE_PII_MODE: full (default) returns name, identifier, email, company, and phone; masked returns name, identifier, company, and masked email/phone; none returns identifiers only.',
       schema: {
-        searchTerm: z
-          .string()
-          .optional()
-          .describe('Filter customers by name or email (partial match)'),
         first: z.number().default(20).describe('Max customers to return'),
         after: z
           .string()
@@ -25,19 +21,15 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
           .describe('Pagination cursor from a previous response'),
       },
       handler: async params => {
-        const { searchTerm, first, after } = params;
-
-        const filterArg = searchTerm
-          ? `, filter: { searchTerm: "${searchTerm}" }`
-          : '';
-        const afterArg = after ? `, after: "${after}"` : '';
+        const { first, after } = params;
 
         const query = `
-          query ListCustomers($tenantId: ID!, $first: Int) {
+          query ListCustomers($tenantId: ID!, $first: Int, $after: String) {
             customer {
               getMany(
                 tenantId: $tenantId
-                first: $first${afterArg}${filterArg}
+                first: $first
+                after: $after
               ) {
                 pageInfo {
                   hasNextPage
@@ -64,17 +56,13 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
         const data = await client.api.pimApi(query, {
           tenantId: client.config.tenantId,
           first,
+          after,
         });
         const result = (data as CustomerListResponse).customer?.getMany;
 
         if (!result) {
           return {
-            content: [
-              {
-                type: 'text',
-                text: `No customers found${searchTerm ? ` matching "${searchTerm}"` : ''}.`,
-              },
-            ],
+            content: [{ type: 'text', text: 'No customers found.' }],
           };
         }
 
@@ -82,12 +70,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
 
         if (customers.length === 0) {
           return {
-            content: [
-              {
-                type: 'text',
-                text: `No customers found${searchTerm ? ` matching "${searchTerm}"` : ''}.`,
-              },
-            ],
+            content: [{ type: 'text', text: 'No customers found.' }],
           };
         }
 
