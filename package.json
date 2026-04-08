@@ -1,7 +1,7 @@
 {
   "name": "@hayodev/crystallize-mcp",
   "mcpName": "io.github.HayoDev/crystallize-mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Crystallize MCP — headless commerce tools for AI agents. Browse catalogue, search products, inspect shapes, manage orders via Model Context Protocol.",
   "type": "module",
   "main": "build/src/index.js",
