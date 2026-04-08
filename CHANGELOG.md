@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.4...crystallize-mcp-v0.1.5) (2026-04-08)
+
+
+### Bug Fixes
+
+* remove broken customer search and make list_orders customerIdentifier optional ([#11](https://github.com/HayoDev/crystallize-mcp/issues/11)) ([62c19c9](https://github.com/HayoDev/crystallize-mcp/commit/62c19c9e9453e29ad7e20d0bd726b358ae009f1c))
+
 ## [0.1.4](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.3...crystallize-mcp-v0.1.4) (2026-04-07)
 
 
