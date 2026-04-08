@@ -21,12 +21,17 @@ function dryRunResult(lines: string[]): ToolResult {
   };
 }
 
+interface ComponentInput {
+  componentId: string;
+  [key: string]: unknown;
+}
+
 /** Map simple component values to PIM API input format. */
 function buildComponentInput(
   componentId: string,
   componentType: string,
   value: unknown,
-): Record<string, unknown> {
+): ComponentInput {
   const base = { componentId };
 
   switch (componentType) {
@@ -46,16 +51,18 @@ function buildComponentInput(
     case 'images':
       return {
         ...base,
-        images: (Array.isArray(value) ? value : [value]).map(v => {
-          const imageValue =
-            v != null && typeof v === 'object'
-              ? (v as Record<string, unknown>)
-              : {};
-          return {
-            key: typeof v === 'string' ? v : String(imageValue.key ?? ''),
-            ...imageValue,
-          };
-        }),
+        images: (Array.isArray(value) ? value : [value])
+          .filter(v => v != null)
+          .map(v => {
+            const imageValue =
+              v != null && typeof v === 'object'
+                ? (v as Record<string, unknown>)
+                : {};
+            return {
+              ...imageValue,
+              key: typeof v === 'string' ? v : String(imageValue.key ?? ''),
+            };
+          }),
       };
     default:
       return { ...base, [componentType]: value };
@@ -128,7 +135,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         // Build component inputs
-        const componentInputs: Record<string, unknown>[] = [];
+        const componentInputs: ComponentInput[] = [];
         if (components) {
           for (const [compId, value] of Object.entries(components)) {
             const compDef = shape.components?.find(c => c.id === compId);
@@ -353,7 +360,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           return dryRunResult(lines);
         }
 
-        // Execute mutation via Core API
+        // Execute mutation via Core API (nextPimApi)
         const mutation = `
           mutation UpdateComponent($itemId: ID!, $language: String!, $component: ComponentInput!) {
             item {

@@ -1,7 +1,9 @@
 /**
  * Audit logger — writes one JSON line per tool call to a configured file.
  *
- * Never logs response content — only what was requested and the shape of the result.
+ * Logs tool name, params, and result status. Write tools may also log
+ * mutation metadata (before/after state) — avoid storing sensitive values
+ * in component data if the audit log is not secured.
  */
 
 import { appendFileSync, mkdirSync } from 'node:fs';
