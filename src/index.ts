@@ -9,6 +9,7 @@ import type { ZodRawShape } from 'zod';
 import { CrystallizeClient } from './client.js';
 import { formatError } from './errors.js';
 import { AuditLogger, summariseResult } from './audit.js';
+import { VERSION } from './version.js';
 import type { AccessMode, ToolDefinition } from './types.js';
 
 // Tool groups
@@ -38,7 +39,7 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
   const server = new McpServer(
     {
       name: 'crystallize-mcp',
-      version: '0.1.0',
+      version: VERSION,
     },
     {
       capabilities: {
