@@ -7,12 +7,19 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
+export interface MutationMeta {
+  type: 'create' | 'update';
+  before?: Record<string, unknown>;
+  after: Record<string, unknown>;
+}
+
 export interface AuditEntry {
   ts: string;
   tool: string;
   params: Record<string, unknown>;
   result: 'ok' | 'error';
   tenant: string;
+  mutation?: MutationMeta;
 }
 
 export class AuditLogger {

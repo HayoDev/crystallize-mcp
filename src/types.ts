@@ -44,6 +44,8 @@ export interface CrystallizeConfig {
   defaultLanguage?: string;
   piiMode?: PiiMode;
   auditLog?: string;
+  /** When true, write tools return a preview instead of executing mutations. */
+  dryRun?: boolean;
 }
 
 /** Error categories for actionable error messages. */

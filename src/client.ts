@@ -17,6 +17,11 @@ function expandPath(p: string): string {
   return p.startsWith('~/') ? join(homedir(), p.slice(2)) : p;
 }
 
+function parseDryRun(): boolean {
+  const raw = process.env.CRYSTALLIZE_DRY_RUN ?? '';
+  return raw === 'true' || raw === '1';
+}
+
 function parsePiiMode(): PiiMode {
   const raw = process.env.CRYSTALLIZE_PII_MODE ?? 'full';
   if (!['full', 'masked', 'none'].includes(raw)) {
@@ -101,6 +106,7 @@ export class CrystallizeClient {
       staticAuthToken,
       accessMode,
       piiMode: parsePiiMode(),
+      dryRun: parseDryRun(),
       auditLog: process.env.CRYSTALLIZE_AUDIT_LOG
         ? expandPath(process.env.CRYSTALLIZE_AUDIT_LOG)
         : undefined,
@@ -150,6 +156,7 @@ export class CrystallizeClient {
       staticAuthToken: process.env.CRYSTALLIZE_STATIC_AUTH_TOKEN,
       accessMode,
       piiMode: parsePiiMode(),
+      dryRun: parseDryRun(),
       auditLog: process.env.CRYSTALLIZE_AUDIT_LOG
         ? expandPath(process.env.CRYSTALLIZE_AUDIT_LOG)
         : undefined,
