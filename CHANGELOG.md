@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.6...crystallize-mcp-v0.1.7) (2026-04-08)
+
+
+### 🎉 Features
+
+* add write tools with dry-run safety ([#15](https://github.com/HayoDev/crystallize-mcp/issues/15)) ([e9898d9](https://github.com/HayoDev/crystallize-mcp/commit/e9898d9e6f376ed2fe7f1ea3da5612efb8bd0a78))
+
 ## [0.1.6](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.5...crystallize-mcp-v0.1.6) (2026-04-08)
 
 
