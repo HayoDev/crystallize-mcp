@@ -9,6 +9,7 @@ import type { ZodRawShape } from 'zod';
 import { CrystallizeClient } from './client.js';
 import { formatError } from './errors.js';
 import { AuditLogger, summariseResult } from './audit.js';
+import type { MutationMeta } from './audit.js';
 import { VERSION } from './version.js';
 import type { AccessMode, ToolDefinition } from './types.js';
 
@@ -78,12 +79,17 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
       async (params: Record<string, unknown>) => {
         try {
           const result = await tool.handler(params);
+          const mutation =
+            'mutation' in result
+              ? (result.mutation as MutationMeta)
+              : undefined;
           audit?.log({
             ts: new Date().toISOString(),
             tool: tool.name,
             params,
             result: summariseResult(result),
             tenant: crystallize.config.tenantIdentifier,
+            mutation,
           });
           return result;
         } catch (error) {

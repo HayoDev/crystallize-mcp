@@ -46,13 +46,16 @@ function buildComponentInput(
     case 'images':
       return {
         ...base,
-        images: (Array.isArray(value) ? value : [value]).map(v => ({
-          key:
-            typeof v === 'string'
-              ? v
-              : ((v as Record<string, string>).key ?? ''),
-          ...(typeof v === 'object' ? v : {}),
-        })),
+        images: (Array.isArray(value) ? value : [value]).map(v => {
+          const imageValue =
+            v != null && typeof v === 'object'
+              ? (v as Record<string, unknown>)
+              : {};
+          return {
+            key: typeof v === 'string' ? v : String(imageValue.key ?? ''),
+            ...imageValue,
+          };
+        }),
       };
     default:
       return { ...base, [componentType]: value };
@@ -183,9 +186,9 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         const mutation = `
-          mutation CreateItem($input: Create${capitalize(itemType)}Input!) {
+          mutation CreateItem($input: Create${capitalize(itemType)}Input!, $language: String!) {
             ${itemType} {
-              create(input: $input, language: "${language}") {
+              create(input: $input, language: $language) {
                 id
                 name
                 tree { path }
@@ -196,6 +199,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
 
         const result = (await client.api.pimApi(mutation, {
           input: createInput,
+          language,
         })) as CreateItemResponse;
         const created = result[itemType]?.create;
 
@@ -225,6 +229,15 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
               ].join('\n'),
             },
           ],
+          mutation: {
+            type: 'create',
+            after: {
+              id: created.id,
+              name: created.name,
+              path,
+              shapeIdentifier,
+            },
+          },
         };
       },
     },
@@ -388,6 +401,11 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
               ].join('\n'),
             },
           ],
+          mutation: {
+            type: 'update',
+            before: { [componentId]: currentValue },
+            after: { [componentId]: value },
+          },
         };
       },
     },
