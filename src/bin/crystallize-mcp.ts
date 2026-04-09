@@ -39,6 +39,13 @@ async function startServer() {
   console.error(`  Tenant: ${client.config.tenantIdentifier}`);
   console.error(`  Access mode: ${client.config.accessMode}`);
   console.error(
+    `  Language: ${client.config.defaultLanguage ?? 'en (fallback)'}`,
+  );
+  console.error(`  PII mode: ${client.config.piiMode}`);
+  if (client.config.auditLog) {
+    console.error(`  Audit log: ${client.config.auditLog}`);
+  }
+  console.error(
     `  Auth: ${client.config.accessTokenId ? 'token' : client.config.staticAuthToken ? 'static' : 'none (public catalogue only)'}`,
   );
 }

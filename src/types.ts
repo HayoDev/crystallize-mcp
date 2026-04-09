@@ -30,6 +30,9 @@ export interface ToolDefinition<T extends ZodRawShape = ZodRawShape> {
   handler: (params: z.objectOutputType<T, z.ZodTypeAny>) => Promise<ToolResult>;
 }
 
+/** PII masking mode for customer/order data. */
+export type PiiMode = 'full' | 'masked' | 'none';
+
 /** Crystallize environment configuration. */
 export interface CrystallizeConfig {
   tenantIdentifier: string;
@@ -38,6 +41,11 @@ export interface CrystallizeConfig {
   accessTokenSecret?: string;
   staticAuthToken?: string;
   accessMode: AccessMode;
+  defaultLanguage?: string;
+  piiMode?: PiiMode;
+  auditLog?: string;
+  /** When true, write tools return a preview instead of executing mutations. */
+  dryRun?: boolean;
 }
 
 /** Error categories for actionable error messages. */

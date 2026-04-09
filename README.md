@@ -1,9 +1,9 @@
 # Crystallize MCP
 
-[![npm version](https://img.shields.io/npm/v/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
-[![license](https://img.shields.io/npm/l/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
-[![node](https://img.shields.io/node/v/crystallize-mcp.svg)](https://npmjs.org/package/crystallize-mcp)
+[![npm version](https://img.shields.io/npm/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
+[![license](https://img.shields.io/npm/l/@hayodev/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
+[![node](https://img.shields.io/node/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
 
 MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI.
 
@@ -18,7 +18,7 @@ Standard MCP config (works in any client):
   "mcpServers": {
     "crystallize": {
       "command": "npx",
-      "args": ["-y", "crystallize-mcp@latest"],
+      "args": ["-y", "@hayodev/crystallize-mcp@latest"],
       "env": {
         "CRYSTALLIZE_TENANT_IDENTIFIER": "your-tenant"
       }
@@ -37,7 +37,7 @@ claude mcp add crystallize \
   -e CRYSTALLIZE_TENANT_IDENTIFIER=your-tenant \
   -e CRYSTALLIZE_ACCESS_TOKEN_ID=your-token-id \
   -e CRYSTALLIZE_ACCESS_TOKEN_SECRET=your-token-secret \
-  -- npx -y crystallize-mcp@latest
+  -- npx -y @hayodev/crystallize-mcp@latest
 ```
 
 Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scope user` for personal use across all projects.
@@ -45,7 +45,7 @@ Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scop
 Or run the guided setup wizard, which can optionally store tokens in the OS keychain instead of plain text:
 
 ```bash
-npx crystallize-mcp --setup
+npx @hayodev/crystallize-mcp --setup
 ```
 
 </details>
@@ -56,7 +56,7 @@ npx crystallize-mcp --setup
 Run the guided wizard — it writes directly to `claude_desktop_config.json` and can store tokens in the macOS Keychain so they never appear in the config file:
 
 ```bash
-npx crystallize-mcp --setup --global
+npx @hayodev/crystallize-mcp --setup --global
 ```
 
 Or add the standard config manually to `~/Library/Application Support/Claude/claude_desktop_config.json`.
@@ -80,7 +80,7 @@ Add the standard config to `.vscode/mcp.json` in your project root.
   "servers": {
     "crystallize": {
       "command": "npx",
-      "args": ["-y", "crystallize-mcp@latest"],
+      "args": ["-y", "@hayodev/crystallize-mcp@latest"],
       "env": {
         "CRYSTALLIZE_TENANT_IDENTIFIER": "your-tenant",
         "CRYSTALLIZE_ACCESS_TOKEN_ID": "your-token-id",
@@ -127,7 +127,7 @@ Add the standard config to `~/.warp/mcp.json`.
 Open "Install MCP Server" in Raycast and fill in:
 
 - **Command**: `npx`
-- **Arguments**: `-y crystallize-mcp@latest`
+- **Arguments**: `-y @hayodev/crystallize-mcp@latest`
 - **Environment**: add `CRYSTALLIZE_TENANT_IDENTIFIER` and your token vars
 
 Or copy the standard config JSON above before opening the command — Raycast will auto-fill the form.
@@ -214,17 +214,53 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 ### Environment variables
 
-| Variable                          | Required | Description                                                                 |
-| --------------------------------- | -------- | --------------------------------------------------------------------------- |
-| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                  |
-| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                 |
-| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                  |
-| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                           |
-| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered |
+| Variable                          | Required | Description                                                                        |
+| --------------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                         |
+| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                        |
+| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                         |
+| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                  |
+| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered        |
+| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses   |
+| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`) |
+
+### PII mode (opt-in)
+
+By default all customer and order data is returned as-is (`full`). Set `CRYSTALLIZE_PII_MODE` to opt in to data minimisation:
+
+| Mode     | Behaviour                                                                                                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`   | Default — all fields returned unchanged                                                                                                                                            |
+| `masked` | Emails → `h***@example.com`, phones → `***-1234`, addresses → city + country only                                                                                                  |
+| `none`   | Contact/PII fields stripped — names, emails, phones, addresses, meta, and external references removed. Non-contact data (order lines, payment types, totals) may still be present. |
+
+Applies to `list_customers`, `get_customer`, `list_orders`, and `get_order`. No effect on catalogue or shape tools.
+
+Relevant for teams handling real customer data, GDPR Article 25 compliance (data minimisation by design), or environments where the AI doesn't need raw contact details to do its job. A common pattern is `masked` on production and `full` on dev.
+
+### Audit log (opt-in)
+
+Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured logging of every tool call:
+
+```json
+{
+  "ts": "2026-04-03T14:38:41Z",
+  "tool": "list_customers",
+  "params": { "first": 10 },
+  "result": "ok",
+  "tenant": "my-store"
+}
+```
+
+One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Response content is never logged.
+
+> **Note:** Params are logged as-is and may contain PII — for example, a `searchTerm` of `hani@example.com` or a `customerIdentifier`. Treat the audit log file as sensitive data and restrict access accordingly. Param scrubbing is on the roadmap but not yet implemented.
+
+Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk) — but ensure your pipeline handles the file with appropriate access controls.
 
 ### Keychain storage (optional)
 
-The setup wizard (`npx crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
+The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
 
 - **Claude Desktop users** — config is written to a JSON file with no CLI equivalent for secret management
 - **Shared `.mcp.json`** — when your project config is committed to git, keychain storage keeps tokens out of the repository
@@ -245,9 +281,11 @@ Note: CLI-based MCP clients (`claude mcp add`, Cursor, Copilot, etc.) store env 
 
 Every response includes clickable links to the Crystallize UI:
 
-- Items → `app.crystallize.com/{tenant}/en/catalogue/{itemId}`
-- Shapes → `app.crystallize.com/{tenant}/en/shapes/{identifier}`
-- Orders → `app.crystallize.com/{tenant}/en/orders/{orderId}`
+- Items → `app.crystallize.com/@{tenant}/{language}/catalogue/{type}/{itemId}`
+- Shapes → `app.crystallize.com/@{tenant}/{language}/settings/shapes/{identifier}`
+- Orders → `app.crystallize.com/@{tenant}/{language}/orders/{orderId}`
+
+The language segment is automatically set from the tenant's default language, bootstrapped at server startup — no configuration needed. Tools that accept a `language` parameter (catalogue, search) use the requested language in both the API call and the generated link.
 
 ## Development
 

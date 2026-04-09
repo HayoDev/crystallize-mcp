@@ -5,17 +5,22 @@
 import { z } from 'zod';
 import type { CrystallizeClient } from '../client.js';
 import type { ToolDefinition } from '../types.js';
+import { maskEmail } from '../pii.js';
 
 export function orderTools(client: CrystallizeClient): ToolDefinition[] {
   return [
     {
       name: 'list_orders',
       description:
-        'List orders for a customer by their identifier. Returns order IDs, dates, totals, and deep links to the Crystallize UI. Supports pagination.',
+        'List orders across the tenant, optionally filtered by customerIdentifier. Returns order IDs, dates, totals, and deep links to the Crystallize UI. Supports pagination.',
       schema: {
         customerIdentifier: z
           .string()
-          .describe('Customer identifier (email or unique ID)'),
+          .min(1)
+          .optional()
+          .describe(
+            'Customer identifier (email or unique ID) — omit to list all orders',
+          ),
         first: z.number().default(20).describe('Max orders to return'),
         after: z
           .string()
@@ -25,11 +30,10 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
       handler: async params => {
         const { customerIdentifier, first, after } = params;
 
-        const afterArg = after ? `, after: "${after}"` : '';
         const query = `
-          query ListOrders($customerIdentifier: String!, $first: Int) {
+          query ListOrders($customerIdentifier: String, $first: Int, $after: String) {
             orders {
-              getAll(customerIdentifier: $customerIdentifier, first: $first${afterArg}) {
+              getAll(customerIdentifier: $customerIdentifier, first: $first, after: $after) {
                 pageInfo {
                   hasNextPage
                   hasPreviousPage
@@ -62,6 +66,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         const data = await client.api.orderApi(query, {
           customerIdentifier,
           first,
+          after,
         });
         const result = (data as OrdersListResponse).orders?.getAll;
 
@@ -70,7 +75,9 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
             content: [
               {
                 type: 'text',
-                text: `No orders found for customer "${customerIdentifier}"`,
+                text: customerIdentifier
+                  ? `No orders found for customer "${customerIdentifier}"`
+                  : 'No orders found.',
               },
             ],
           };
@@ -83,26 +90,43 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
             content: [
               {
                 type: 'text',
-                text: `No orders found for customer "${customerIdentifier}"`,
+                text: customerIdentifier
+                  ? `No orders found for customer "${customerIdentifier}"`
+                  : 'No orders found.',
               },
             ],
           };
         }
 
         const total = result.pageInfo.totalNodes ?? orders.length;
+        const pii = client.config.piiMode;
+
+        let displayIdentifier = customerIdentifier;
+        if (
+          customerIdentifier &&
+          pii !== 'full' &&
+          customerIdentifier.includes('@')
+        ) {
+          displayIdentifier = maskEmail(customerIdentifier);
+        }
+
         const lines: string[] = [
-          `Orders for "${customerIdentifier}" (${orders.length} of ${total}):`,
+          customerIdentifier
+            ? `Orders for "${displayIdentifier}" (${orders.length} of ${total}):`
+            : `Orders (${orders.length} of ${total}):`,
           '',
         ];
 
         for (const order of orders) {
-          const name = [order.customer?.firstName, order.customer?.lastName]
-            .filter(Boolean)
-            .join(' ');
           lines.push(`Order ${order.id}`);
           lines.push(`  Created: ${order.createdAt}`);
-          if (name) {
-            lines.push(`  Customer: ${name}`);
+          if (pii !== 'none') {
+            const name = [order.customer?.firstName, order.customer?.lastName]
+              .filter(Boolean)
+              .join(' ');
+            if (name) {
+              lines.push(`  Customer: ${name}`);
+            }
           }
           if (order.total) {
             lines.push(
@@ -171,7 +195,8 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
                   tax { name percent }
                 }
                 payment {
-                  provider
+                  __typename
+                  ... on CustomPayment { provider }
                 }
               }
             }
@@ -195,21 +220,38 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
           `  Link: ${client.orderLink(order.id)}`,
         ];
 
+        const pii = client.config.piiMode;
+
         if (order.customer) {
           const c = order.customer;
-          const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
           lines.push('');
-          lines.push(`Customer: ${name || c.identifier} (${c.identifier})`);
-          for (const addr of c.addresses ?? []) {
-            const addrStr = [addr.street, addr.city, addr.country]
-              .filter(Boolean)
-              .join(', ');
-            lines.push(`  ${addr.type}: ${addrStr}`);
-            if (addr.email) {
-              lines.push(`    Email: ${addr.email}`);
-            }
-            if (addr.phone) {
-              lines.push(`    Phone: ${addr.phone}`);
+          const maskedId =
+            pii !== 'full' && c.identifier.includes('@')
+              ? maskEmail(c.identifier)
+              : c.identifier;
+          if (pii === 'none') {
+            lines.push(`Customer: ${maskedId}`);
+          } else {
+            const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
+            lines.push(`Customer: ${name || maskedId} (${maskedId})`);
+            for (const addr of c.addresses ?? []) {
+              if (pii === 'masked') {
+                const addrStr = [addr.city, addr.country]
+                  .filter(Boolean)
+                  .join(', ');
+                lines.push(`  ${addr.type}: ${addrStr || '(masked)'}`);
+              } else {
+                const addrStr = [addr.street, addr.city, addr.country]
+                  .filter(Boolean)
+                  .join(', ');
+                lines.push(`  ${addr.type}: ${addrStr}`);
+                if (addr.email) {
+                  lines.push(`    Email: ${addr.email}`);
+                }
+                if (addr.phone) {
+                  lines.push(`    Phone: ${addr.phone}`);
+                }
+              }
             }
           }
         }
@@ -241,7 +283,9 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         if (order.payment?.length) {
-          const providers = order.payment.map(p => p.provider).join(', ');
+          const providers = order.payment
+            .map(p => p.provider ?? p.__typename ?? 'unknown')
+            .join(', ');
           lines.push('');
           lines.push(`Payment: ${providers}`);
         }
@@ -304,7 +348,7 @@ interface OrderDetail extends OrderSummary {
     currency: string;
     tax?: { name: string; percent: number };
   };
-  payment?: { provider: string }[];
+  payment?: { provider?: string; __typename?: string }[];
 }
 
 interface OrdersListResponse {
