@@ -173,6 +173,7 @@ describe('update_component dry-run', () => {
       dryRun: true,
     });
 
+    // PIM API returns item shape info + path
     Object.defineProperty(client.api, 'pimApi', {
       value: async () => ({
         item: {
@@ -180,6 +181,7 @@ describe('update_component dry-run', () => {
             id: 'item-123',
             name: 'My Product',
             type: 'product',
+            tree: { path: '/products/my-product' },
             shape: {
               identifier: 'product-shape',
               name: 'Product',
@@ -187,13 +189,19 @@ describe('update_component dry-run', () => {
                 { id: 'description', name: 'Description', type: 'singleLine' },
               ],
             },
-            components: [
-              {
-                componentId: 'description',
-                type: 'singleLine',
-                content: { text: 'Old description' },
-              },
-            ],
+          },
+        },
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    // Catalogue API returns current component value
+    Object.defineProperty(client.api, 'catalogueApi', {
+      value: async () => ({
+        catalogue: {
+          component: {
+            content: { text: 'Old description' },
           },
         },
       }),
@@ -266,12 +274,12 @@ describe('update_component dry-run', () => {
             id: 'item-123',
             name: 'Test Item',
             type: 'document',
+            tree: { path: '/test' },
             shape: {
               identifier: 'doc-shape',
               name: 'Doc',
               components: [{ id: 'title', name: 'Title', type: 'singleLine' }],
             },
-            components: [],
           },
         },
       }),
@@ -288,6 +296,130 @@ describe('update_component dry-run', () => {
     const result = await updateComp.handler({
       itemId: 'item-123',
       componentId: 'nonexistent',
+      value: 'test',
+      language: 'en',
+    });
+
+    assert.strictEqual(result.isError, true);
+    assert.ok(result.content[0].text.includes('nonexistent'));
+    assert.ok(result.content[0].text.includes('title'));
+  });
+
+  it('supports dot notation for contentChunk children', async () => {
+    const client = new CrystallizeClient({
+      tenantIdentifier: 'test-tenant',
+      accessMode: 'write',
+      dryRun: true,
+    });
+
+    Object.defineProperty(client.api, 'pimApi', {
+      value: async () => ({
+        item: {
+          get: {
+            id: 'item-456',
+            name: 'Article',
+            type: 'document',
+            tree: { path: '/articles/test' },
+            shape: {
+              identifier: 'article',
+              name: 'Article',
+              components: [
+                {
+                  id: 'hero',
+                  name: 'Hero',
+                  type: 'contentChunk',
+                  config: {
+                    components: [
+                      { id: 'title', name: 'Title', type: 'singleLine' },
+                      { id: 'image', name: 'Image', type: 'images' },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(client.api, 'catalogueApi', {
+      value: async () => ({
+        catalogue: { component: { content: null } },
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const tools = contentTools(client);
+    const updateComp = tools.find(t => t.name === 'update_component');
+    if (!updateComp) {
+      throw new Error('update_component not found');
+    }
+
+    const result = await updateComp.handler({
+      itemId: 'item-456',
+      componentId: 'hero.title',
+      value: 'New Hero Title',
+      language: 'en',
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    const text = result.content[0].text;
+    assert.ok(text.includes('[DRY RUN]'));
+    assert.ok(text.includes('Hero'));
+    assert.ok(text.includes('New Hero Title'));
+    assert.ok(text.includes('contentChunk'));
+  });
+
+  it('returns error for invalid chunk child', async () => {
+    const client = new CrystallizeClient({
+      tenantIdentifier: 'test-tenant',
+      accessMode: 'write',
+      dryRun: true,
+    });
+
+    Object.defineProperty(client.api, 'pimApi', {
+      value: async () => ({
+        item: {
+          get: {
+            id: 'item-456',
+            name: 'Article',
+            type: 'document',
+            tree: { path: '/articles/test' },
+            shape: {
+              identifier: 'article',
+              name: 'Article',
+              components: [
+                {
+                  id: 'hero',
+                  name: 'Hero',
+                  type: 'contentChunk',
+                  config: {
+                    components: [
+                      { id: 'title', name: 'Title', type: 'singleLine' },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const tools = contentTools(client);
+    const updateComp = tools.find(t => t.name === 'update_component');
+    if (!updateComp) {
+      throw new Error('update_component not found');
+    }
+
+    const result = await updateComp.handler({
+      itemId: 'item-456',
+      componentId: 'hero.nonexistent',
       value: 'test',
       language: 'en',
     });
