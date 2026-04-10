@@ -11,6 +11,20 @@ Works with Claude Code, Claude Desktop, Cursor, Windsurf, Copilot, and any MCP-c
 
 ## Getting started
 
+### Setup wizard
+
+The interactive wizard handles config, auth tokens, keychain storage, and PII mode in one step:
+
+```bash
+# Project-level — writes .mcp.json in the current directory (shared with your team)
+npx @hayodev/crystallize-mcp --setup
+
+# Global — registers via `claude mcp add` (Claude Code) or writes Claude Desktop config
+npx @hayodev/crystallize-mcp --setup --global
+```
+
+### Manual config
+
 Standard MCP config (works in any client):
 
 ```json
@@ -30,7 +44,7 @@ Standard MCP config (works in any client):
 Add `CRYSTALLIZE_ACCESS_TOKEN_ID` and `CRYSTALLIZE_ACCESS_TOKEN_SECRET` to the `env` block for PIM tools (shapes, orders, customers). See [Authentication](#authentication).
 
 <details>
-<summary>Claude Code</summary>
+<summary>Claude Code (CLI)</summary>
 
 ```bash
 claude mcp add crystallize \
@@ -42,24 +56,12 @@ claude mcp add crystallize \
 
 Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scope user` for personal use across all projects.
 
-Or run the guided setup wizard, which can optionally store tokens in the OS keychain instead of plain text:
-
-```bash
-npx @hayodev/crystallize-mcp --setup
-```
-
 </details>
 
 <details>
 <summary>Claude Desktop</summary>
 
-Run the guided wizard — it writes directly to `claude_desktop_config.json` and can store tokens in the macOS Keychain so they never appear in the config file:
-
-```bash
-npx @hayodev/crystallize-mcp --setup --global
-```
-
-Or add the standard config manually to `~/Library/Application Support/Claude/claude_desktop_config.json`.
+Add the standard config to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
 
 </details>
 
@@ -135,13 +137,15 @@ Or copy the standard config JSON above before opening the command — Raycast wi
 </details>
 
 <details>
-<summary>From source</summary>
+<summary>From source (maintainers)</summary>
+
+The `--local` flag is for developing crystallize-mcp itself. It writes `.mcp.json` pointing to the local build output — **run this from the repo root only**:
 
 ```bash
 git clone https://github.com/HayoDev/crystallize-mcp.git
 cd crystallize-mcp
 npm install && npm run build
-npx . --setup --local   # writes .mcp.json pointing to local build
+npx . --setup --local   # writes .mcp.json pointing to ./build/
 ```
 
 Or point your MCP client directly at the built entry point:
@@ -311,14 +315,14 @@ Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk) — but ensure y
 
 ### Keychain storage (optional)
 
-The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
+The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. The MCP server resolves credentials from the keychain automatically at startup — no extra configuration needed.
 
-- **Claude Desktop users** — config is written to a JSON file with no CLI equivalent for secret management
-- **Shared `.mcp.json`** — when your project config is committed to git, keychain storage keeps tokens out of the repository
+This is useful when:
 
-When tokens are in the keychain, the config only needs `CRYSTALLIZE_TENANT_IDENTIFIER` — credentials are resolved automatically at startup.
+- **Your `.mcp.json` is committed to git** — keychain keeps tokens out of the repository
+- **You prefer not to have secrets in plain text config files** — the config only needs `CRYSTALLIZE_TENANT_IDENTIFIER`
 
-Note: CLI-based MCP clients (`claude mcp add`, Cursor, Copilot, etc.) store env vars as plain text in their config files and do not integrate with the OS keychain directly. If plain text env vars in a local config file are acceptable for your setup, the wizard's keychain option is not needed.
+When using `--setup --global` with Claude Code, the wizard runs `claude mcp add` with only the non-secret env vars. Tokens are read from the keychain at runtime, so they never appear in the Claude Code config either.
 
 ### Access mode
 
