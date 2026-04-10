@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.8...crystallize-mcp-v0.1.9) (2026-04-10)
+
+
+### 🎉 Features
+
+* support content chunk updates with dot notation and fix richTex… ([#18](https://github.com/HayoDev/crystallize-mcp/issues/18)) ([a68f6b8](https://github.com/HayoDev/crystallize-mcp/commit/a68f6b8e3d4c57da475722149561ce5d96720906))
+
 ## [0.1.8](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.7...crystallize-mcp-v0.1.8) (2026-04-10)
 
 
