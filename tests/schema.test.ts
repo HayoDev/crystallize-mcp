@@ -331,10 +331,10 @@ describe('schema introspection with mock API', () => {
     });
 
     // Generate a schema large enough to exceed the 50k auto-summary threshold
-    const largeTypes = Array.from({ length: 200 }, (_, i) => ({
+    const largeTypes = Array.from({ length: 200 }, (_a, i) => ({
       kind: 'OBJECT',
       name: `GeneratedType${i}`,
-      fields: Array.from({ length: 20 }, (_, j) => ({
+      fields: Array.from({ length: 20 }, (_b, j) => ({
         name: `field${j}WithALongNameToInflateSize`,
         type: { kind: 'SCALAR', name: 'String', ofType: null },
         args: [],
