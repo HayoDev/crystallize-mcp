@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.10...crystallize-mcp-v0.2.0) (2026-04-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* setup-wizard :nail-care: ([#23](https://github.com/HayoDev/crystallize-mcp/issues/23))
+
+### 🎉 Features
+
+* setup-wizard :nail-care: ([#23](https://github.com/HayoDev/crystallize-mcp/issues/23)) ([22bd11a](https://github.com/HayoDev/crystallize-mcp/commit/22bd11a1167a80cfd34bc0986a20e38725712296))
+
 ## [0.1.10](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.9...crystallize-mcp-v0.1.10) (2026-04-10)
 
 
