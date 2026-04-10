@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/npm/l/@hayodev/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
 
-MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI.
+MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read and write access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI, dry-run safety for mutations, and PII masking for customer data.
 
 Works with Claude Code, Claude Desktop, Cursor, Windsurf, Copilot, and any MCP-compatible client.
 
@@ -162,7 +162,7 @@ Or point your MCP client directly at the built entry point:
 
 </details>
 
-## Tools (12)
+## Tools (16)
 
 ### Catalogue (4 tools)
 
@@ -203,6 +203,56 @@ Or point your MCP client directly at the built entry point:
 | `list_customers` | Search and list customers with pagination                    |
 | `get_customer`   | Full customer profile — addresses, meta, external references |
 
+### Content (2 tools, requires auth + write mode)
+
+| Tool               | Description                                                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| `create_item`      | Create a new item (product, document, or folder) with components                                      |
+| `update_component` | Update a single component value — supports nested content chunks via dot notation (e.g. `hero.title`) |
+
+## Write tools
+
+Write tools require `CRYSTALLIZE_ACCESS_MODE=write` (or `admin`) and a token with write permissions.
+
+### Dry-run mode
+
+Set `CRYSTALLIZE_DRY_RUN=true` to preview mutations without executing them. The response shows exactly what would change — the mutation payload, before/after values, and a deep link to the item:
+
+```json
+"env": {
+  "CRYSTALLIZE_ACCESS_MODE": "write",
+  "CRYSTALLIZE_DRY_RUN": "true"
+}
+```
+
+### Example prompts
+
+**Create an item:**
+
+> "Create a new blog post under /blog using the article shape with title 'Getting Started'"
+
+**Update a top-level component:**
+
+> "Find the item at /products/summer-collection and update its description to 'New summer arrivals'"
+
+**Update a component inside a content chunk:**
+
+> "Get the item at /articles/my-post, then update hero.title to 'Updated Headline' and give me the deep link to review the draft"
+
+**Update with change summary:**
+
+> "Get the item at /articles/guides/my-guide, update its title component to 'New Guide Title', give me the deep link, and show a table of which fields in the chunk changed vs remained unchanged with before/after values"
+
+The agent will update the target component in **draft only**, preserve all sibling components in the chunk, and return a summary like:
+
+| Component   | Status     | Before             | After              |
+| ----------- | ---------- | ------------------ | ------------------ |
+| title       | ✏️ Updated | Old Guide Title    | New Guide Title    |
+| image       | Unchanged  | _(existing image)_ | _(existing image)_ |
+| description | Unchanged  | _(existing text)_  | _(existing text)_  |
+
+No publishing happens — you review the change in the Crystallize UI via the deep link and publish when ready.
+
 ## Authentication
 
 Catalogue and Discovery tools work without auth — just set `CRYSTALLIZE_TENANT_IDENTIFIER`.
@@ -214,15 +264,16 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 ### Environment variables
 
-| Variable                          | Required | Description                                                                        |
-| --------------------------------- | -------- | ---------------------------------------------------------------------------------- |
-| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                         |
-| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                        |
-| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                         |
-| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                  |
-| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered        |
-| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses   |
-| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`) |
+| Variable                          | Required | Description                                                                            |
+| --------------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                             |
+| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                            |
+| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                             |
+| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                      |
+| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered            |
+| `CRYSTALLIZE_DRY_RUN`             | No       | `true` to preview write operations without executing — see [Write tools](#write-tools) |
+| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses       |
+| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`)     |
 
 ### PII mode (opt-in)
 
@@ -252,7 +303,7 @@ Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured loggin
 }
 ```
 
-One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Response content is never logged.
+One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Write tools also log mutation metadata (before/after state) for audit trails.
 
 > **Note:** Params are logged as-is and may contain PII — for example, a `searchTerm` of `hani@example.com` or a `customerIdentifier`. Treat the audit log file as sensitive data and restrict access accordingly. Param scrubbing is on the roadmap but not yet implemented.
 
@@ -274,8 +325,8 @@ Note: CLI-based MCP clients (`claude mcp add`, Cursor, Copilot, etc.) store env 
 `CRYSTALLIZE_ACCESS_MODE` controls which tools the MCP server registers at startup:
 
 - **`read`** (default) — read-only tools only
-- **`write`** — includes tools that can create/update content (Phase 3)
-- **`admin`** — full access including webhooks and tenant config (Phase 3)
+- **`write`** — includes content creation and component updates (with dry-run support)
+- **`admin`** — full access including shape modifications and tenant config
 
 ## Deep links
 
