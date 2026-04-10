@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.7...crystallize-mcp-v0.1.8) (2026-04-10)
+
+
+### 🎉 Features
+
+* add GraphQL schema introspection tools ([#17](https://github.com/HayoDev/crystallize-mcp/issues/17)) ([f4775bd](https://github.com/HayoDev/crystallize-mcp/commit/f4775bd90152ff18898926aa017ccfece37bb7c0))
+
 ## [0.1.7](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.6...crystallize-mcp-v0.1.7) (2026-04-08)
 
 
