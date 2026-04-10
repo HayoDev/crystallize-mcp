@@ -389,6 +389,17 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
 
         // Parse dot notation for nested components
         const parts = componentId.split('.');
+        if (parts.some(p => p.length === 0)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Invalid componentId — dot notation must not contain empty segments (e.g. ".title", "hero.", "hero..title"). Use "componentId" or "chunkId.childId".',
+              },
+            ],
+            isError: true,
+          };
+        }
         const topLevelId = parts[0];
         const childId = parts.length > 1 ? parts.slice(1).join('.') : undefined;
 
@@ -557,17 +568,31 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
               }
 
               let foundTarget = false;
-              const merged = firstRow
-                .map((c: ChunkChild) => {
-                  if (c.componentId === childId) {
-                    foundTarget = true;
-                    return innerInput;
-                  }
-                  return contentToInput(c.componentId, c.type, c.content);
-                })
-                .filter(
-                  (v: ComponentInput | null): v is ComponentInput => v !== null,
+              const merged: ComponentInput[] = [];
+              for (const c of firstRow) {
+                if (c.componentId === childId) {
+                  foundTarget = true;
+                  merged.push(innerInput);
+                  continue;
+                }
+                const siblingInput = contentToInput(
+                  c.componentId,
+                  c.type,
+                  c.content,
                 );
+                if (siblingInput === null) {
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: `Cannot update "${childId}" in chunk "${topLevelId}": sibling "${c.componentId}" has unsupported type "${c.type}". Updating would wipe that sibling's data.`,
+                      },
+                    ],
+                    isError: true,
+                  };
+                }
+                merged.push(siblingInput);
+              }
               if (!foundTarget) {
                 merged.push(innerInput);
               }

@@ -428,6 +428,34 @@ describe('update_component dry-run', () => {
     assert.ok(result.content[0].text.includes('nonexistent'));
     assert.ok(result.content[0].text.includes('title'));
   });
+
+  it('returns error for empty dot notation segments', async () => {
+    const client = new CrystallizeClient({
+      tenantIdentifier: 'test-tenant',
+      accessMode: 'write',
+      dryRun: true,
+    });
+
+    const tools = contentTools(client);
+    const updateComp = tools.find(t => t.name === 'update_component');
+    if (!updateComp) {
+      throw new Error('update_component not found');
+    }
+
+    for (const bad of ['.title', 'hero.', 'hero..title']) {
+      const result = await updateComp.handler({
+        itemId: 'item-123',
+        componentId: bad,
+        value: 'test',
+        language: 'en',
+      });
+      assert.strictEqual(result.isError, true, `Expected error for "${bad}"`);
+      assert.ok(
+        result.content[0].text.includes('empty segments'),
+        `Expected empty segments error for "${bad}"`,
+      );
+    }
+  });
 });
 
 // --- Audit mutation metadata ---
