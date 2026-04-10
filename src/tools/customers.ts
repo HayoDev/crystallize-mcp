@@ -106,6 +106,7 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
               );
             }
           }
+          lines.push(`  Edit: ${client.customerLink(c.identifier)}`);
           lines.push('');
         }
 
@@ -195,7 +196,10 @@ export function customerTools(client: CrystallizeClient): ToolDefinition[] {
             ? maskEmail(customer.identifier)
             : customer.identifier;
 
-        const lines: string[] = [`  Identifier: ${maskedId}`];
+        const lines: string[] = [
+          `  Identifier: ${maskedId}`,
+          `  Edit: ${client.customerLink(customer.identifier)}`,
+        ];
 
         if (pii !== 'none') {
           const name = [customer.firstName, customer.lastName]

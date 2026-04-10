@@ -1,12 +1,99 @@
 /**
  * Shape & tenant tools — inspect shapes, components, and tenant configuration.
+ *
+ * All queries are built dynamically via PIM API introspection — no hardcoded GraphQL.
+ * Uses a multi-step approach: first introspect the schema to discover types,
+ * then do targeted __type queries for any nested types that need deeper detail.
  */
 
 import { z } from 'zod';
 import type { CrystallizeClient } from '../client.js';
 import type { ToolDefinition } from '../types.js';
+import {
+  introspectApi,
+  execNestedWithRetry,
+  type ApiSchema,
+} from './introspect.js';
+
+// --- PIM introspection (delegates to shared engine) ---
+
+function introspectPim(client: CrystallizeClient): Promise<ApiSchema> {
+  return introspectApi(
+    'pim',
+    (q, v) => client.api.pimApi(q, v ?? {}),
+    [['shape', 'get'], ['shape', 'getMany'], ['tenant', 'get']],
+  );
+}
+
+// --- Config formatting ---
+
+/** Extract and format relevant config properties from a component. */
+function formatComponentConfig(comp: any, lines: string[], indent: string): void {
+  const config = comp.config;
+  if (!config || typeof config !== 'object') {
+    return;
+  }
+
+  const props: string[] = [];
+
+  // Common config fields across component types
+  if (config.repeatable !== undefined) {
+    props.push(`repeatable: ${config.repeatable}`);
+  }
+  if (config.min !== undefined) {
+    props.push(`min: ${config.min}`);
+  }
+  if (config.max !== undefined) {
+    props.push(`max: ${config.max}`);
+  }
+  if (config.minItems !== undefined) {
+    props.push(`minItems: ${config.minItems}`);
+  }
+  if (config.maxItems !== undefined) {
+    props.push(`maxItems: ${config.maxItems}`);
+  }
+  if (config.acceptedContentTypes) {
+    props.push(`acceptedContentTypes: ${JSON.stringify(config.acceptedContentTypes)}`);
+  }
+
+  // Show any remaining scalar config values we haven't listed
+  for (const [key, value] of Object.entries(config)) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      typeof value !== 'object' &&
+      !['repeatable', 'min', 'max', 'minItems', 'maxItems', 'acceptedContentTypes'].includes(key)
+    ) {
+      props.push(`${key}: ${value}`);
+    }
+  }
+
+  if (props.length) {
+    lines.push(`${indent}Config: ${props.join(', ')}`);
+  }
+
+  // Show nested components (e.g. contentChunk's inner components)
+  const nested = config.components ?? config.choices;
+  if (Array.isArray(nested) && nested.length) {
+    const label = config.components ? 'Nested components' : 'Choices';
+    lines.push(`${indent}${label}:`);
+    for (const sub of nested) {
+      lines.push(`${indent}  ${sub.id ?? sub.name ?? '?'} — ${sub.name ?? ''} [${sub.type ?? '?'}]`);
+      if (sub.description) {
+        lines.push(`${indent}    ${sub.description}`);
+      }
+    }
+  }
+}
+
+// --- Tool definitions ---
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
+  const pimCall = (q: string, v?: Record<string, unknown>) =>
+    client.api.pimApi(q, v ?? {});
+
   return [
     {
       name: 'list_shapes',
@@ -14,28 +101,14 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         'List all shapes defined in the tenant. Returns shape names, identifiers, types, and component counts with deep links to the Crystallize UI.',
       schema: {},
       handler: async () => {
-        const query = `
-          query ListShapes($tenantId: ID!) {
-            shape {
-              getMany(tenantId: $tenantId) {
-                identifier
-                name
-                type
-                components {
-                  id
-                  name
-                  type
-                }
-              }
-            }
-          }
-        `;
+        const schema = await introspectPim(client);
 
-        const data = await client.api.pimApi(query, {
-          tenantId: client.config.tenantId,
-        });
-        const shapes = (data as { shape: { getMany: ShapeSummary[] } }).shape
-          .getMany;
+        const data = (await execNestedWithRetry(
+          pimCall, schema, 'shape', 'getMany',
+          { tenantId: client.config.tenantId }, 1,
+        )) as any;
+
+        const shapes = data.shape?.getMany as any[] | undefined;
 
         if (!shapes?.length) {
           return {
@@ -51,14 +124,15 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
 
         for (const shape of shapes) {
           lines.push(`${shape.name} (${shape.identifier}) [${shape.type}]`);
-          lines.push(`  Components: ${shape.components?.length ?? 0}`);
-          if (shape.components?.length) {
-            const componentList = shape.components
-              .map(c => `${c.id} (${c.type})`)
+          const components = shape.components as any[] | undefined;
+          lines.push(`  Components: ${components?.length ?? 0}`);
+          if (components?.length) {
+            const componentList = components
+              .map((c: any) => `${c.id} (${c.type})`)
               .join(', ');
             lines.push(`  ${componentList}`);
           }
-          lines.push(`  Link: ${client.shapeLink(shape.identifier)}`);
+          lines.push(`  Edit: ${client.shapeLink(shape.identifier)}`);
           lines.push('');
         }
 
@@ -79,43 +153,14 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
       },
       handler: async params => {
         const { identifier } = params;
+        const schema = await introspectPim(client);
 
-        const query = `
-          query GetShape($identifier: String!, $tenantId: ID!) {
-            shape {
-              get(identifier: $identifier, tenantId: $tenantId) {
-                identifier
-                name
-                type
-                components {
-                  id
-                  name
-                  type
-                  description
-                  config {
-                    ... on ComponentConfig {
-                      min
-                      max
-                    }
-                  }
-                }
-                variantComponents {
-                  id
-                  name
-                  type
-                  description
-                }
-              }
-            }
-          }
-        `;
+        const data = (await execNestedWithRetry(
+          pimCall, schema, 'shape', 'get',
+          { identifier, tenantId: client.config.tenantId }, 2,
+        )) as any;
 
-        const data = await client.api.pimApi(query, {
-          identifier,
-          tenantId: client.config.tenantId,
-        });
-        const shape = (data as { shape: { get: ShapeDetail | null } }).shape
-          .get;
+        const shape = data.shape?.get;
 
         if (!shape) {
           return {
@@ -131,28 +176,32 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
 
         const lines: string[] = [
           `${shape.name} (${shape.identifier}) [${shape.type}]`,
-          `Link: ${client.shapeLink(shape.identifier)}`,
+          `Edit: ${client.shapeLink(shape.identifier)}`,
           '',
         ];
 
-        if (shape.components?.length) {
-          lines.push(`Item Components (${shape.components.length}):`);
-          for (const comp of shape.components) {
+        const components = shape.components as any[] | undefined;
+        if (components?.length) {
+          lines.push(`Item Components (${components.length}):`);
+          for (const comp of components) {
             lines.push(`  ${comp.id} — ${comp.name} [${comp.type}]`);
             if (comp.description) {
               lines.push(`    ${comp.description}`);
             }
+            formatComponentConfig(comp, lines, '    ');
           }
           lines.push('');
         }
 
-        if (shape.variantComponents?.length) {
-          lines.push(`Variant Components (${shape.variantComponents.length}):`);
-          for (const comp of shape.variantComponents) {
+        const variantComponents = shape.variantComponents as any[] | undefined;
+        if (variantComponents?.length) {
+          lines.push(`Variant Components (${variantComponents.length}):`);
+          for (const comp of variantComponents) {
             lines.push(`  ${comp.id} — ${comp.name} [${comp.type}]`);
             if (comp.description) {
               lines.push(`    ${comp.description}`);
             }
+            formatComponentConfig(comp, lines, '    ');
           }
         }
 
@@ -168,30 +217,14 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         'Get tenant configuration including name, identifier, available languages, and default language.',
       schema: {},
       handler: async () => {
-        const query = `
-          query GetTenant($identifier: String!) {
-            tenant {
-              get(identifier: $identifier) {
-                id
-                identifier
-                name
-                defaults {
-                  language
-                  currency
-                }
-                availableLanguages {
-                  code
-                  name
-                }
-              }
-            }
-          }
-        `;
+        const schema = await introspectPim(client);
 
-        const data = await client.api.pimApi(query, {
-          identifier: client.config.tenantIdentifier,
-        });
-        const tenant = (data as { tenant: { get: TenantInfo } }).tenant.get;
+        const data = (await execNestedWithRetry(
+          pimCall, schema, 'tenant', 'get',
+          { identifier: client.config.tenantIdentifier }, 1,
+        )) as any;
+
+        const tenant = data.tenant?.get;
 
         const lines: string[] = [
           `${tenant.name}`,
@@ -204,9 +237,13 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
 
         if (tenant.availableLanguages?.length) {
           const langs = tenant.availableLanguages
-            .map(l => `${l.name} (${l.code})`)
+            .map((l: any) => `${l.name} (${l.code})`)
             .join(', ');
           lines.push(`  Languages: ${langs}`);
+        }
+
+        if (client.config.frontendUrl) {
+          lines.push(`  Frontend: ${client.config.frontendUrl}`);
         }
 
         return {
@@ -215,34 +252,4 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
       },
     },
   ];
-}
-
-// --- Internal types ---
-
-interface ShapeSummary {
-  identifier: string;
-  name: string;
-  type: string;
-  components?: { id: string; name: string; type: string }[];
-}
-
-interface ShapeDetail extends ShapeSummary {
-  components?: ComponentDetail[];
-  variantComponents?: ComponentDetail[];
-}
-
-interface ComponentDetail {
-  id: string;
-  name: string;
-  type: string;
-  description?: string;
-  config?: Record<string, unknown>;
-}
-
-interface TenantInfo {
-  id: string;
-  identifier: string;
-  name: string;
-  defaults?: { language?: string; currency?: string };
-  availableLanguages?: { code: string; name: string }[];
 }

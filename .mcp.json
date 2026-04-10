@@ -2,7 +2,9 @@
   "mcpServers": {
     "crystallize": {
       "command": "node",
-      "args": [""],
+      "args": [
+        "/Users/slimboyfat/Dev/CrystallizeMCP/crystallize-mcp/build/src/bin/crystallize-mcp.js"
+      ],
       "env": {
         "CRYSTALLIZE_TENANT_IDENTIFIER": "hageland-dev"
       }

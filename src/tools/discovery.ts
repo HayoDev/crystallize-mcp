@@ -333,7 +333,7 @@ export function discoveryTools(client: CrystallizeClient): ToolDefinition[] {
 
         const lines: string[] = [
           `${shape.name} — ${shape.fields.length} fields`,
-          `Link: ${client.shapeLink(shape.name)}`,
+          `Edit: ${client.shapeLink(shape.name)}`,
           '',
           'Fields:',
         ];
@@ -358,6 +358,29 @@ interface Summary {
 }
 
 // --- Formatters ---
+
+/** Format a nested object by extracting common meaningful fields. */
+function formatNestedObject(obj: Record<string, unknown>): string {
+  // Prioritise well-known field combos (name+path, url, etc.)
+  const name = obj.name as string | undefined;
+  const path = obj.path as string | undefined;
+  const url = obj.url as string | undefined;
+  if (name && path) {return `${name} (${path})`;}
+  if (name && url) {return `${name} — ${url}`;}
+  if (url) {return String(url);}
+  if (name) {return String(name);}
+  if (path) {return String(path);}
+
+  // Fallback: list scalar fields inline
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) {continue;}
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+      parts.push(`${k}: ${v}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(', ') : JSON.stringify(obj);
+}
 
 function formatBrowseResult(
   shapeName: string,
@@ -392,14 +415,29 @@ function formatBrowseResult(
         typeof value === 'boolean'
       ) {
         lines.push(`  ${key}: ${value}`);
+      } else if (Array.isArray(value)) {
+        const items = value.map(v =>
+          typeof v === 'object' && v !== null
+            ? formatNestedObject(v as Record<string, unknown>)
+            : String(v),
+        );
+        lines.push(`  ${key}: ${items.join(', ')}`);
       } else if (typeof value === 'object') {
-        lines.push(`  ${key}: ${JSON.stringify(value)}`);
+        lines.push(`  ${key}: ${formatNestedObject(value as Record<string, unknown>)}`);
       }
     }
 
     if (itemId) {
       const itemType = (hit.type as string) ?? 'document';
-      lines.push(`  Link: ${client.itemLink(itemId, itemType)}`);
+      lines.push(`  Edit: ${client.itemLink(itemId, itemType)}`);
+      const path = hit.path as string | undefined;
+      if (path) {
+        const isDraft = !hit.publishedAt;
+        const frontendLink = client.catalogueLink(path, isDraft);
+        if (frontendLink) {
+          lines.push(`  Frontend: ${frontendLink}`);
+        }
+      }
     }
     lines.push('');
   }

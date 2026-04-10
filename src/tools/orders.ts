@@ -133,7 +133,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
               `  Total: ${order.total.gross} ${order.total.currency} (net: ${order.total.net})`,
             );
           }
-          lines.push(`  Link: ${client.orderLink(order.id)}`);
+          lines.push(`  Edit: ${client.orderLink(order.id)}`);
           lines.push('');
         }
 
@@ -217,7 +217,7 @@ export function orderTools(client: CrystallizeClient): ToolDefinition[] {
           `Order ${order.id}`,
           `  Created: ${order.createdAt}`,
           `  Updated: ${order.updatedAt}`,
-          `  Link: ${client.orderLink(order.id)}`,
+          `  Edit: ${client.orderLink(order.id)}`,
         ];
 
         const pii = client.config.piiMode;

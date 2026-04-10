@@ -70,6 +70,7 @@ function buildComponentInput(
 }
 
 export function contentTools(client: CrystallizeClient): ToolDefinition[] {
+  const defaultLang = () => client.config.defaultLanguage ?? 'en';
   return [
     {
       name: 'create_item',
@@ -98,12 +99,13 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           ),
         language: z
           .string()
-          .default('en')
-          .describe('Language code for the item name and components'),
+          .optional()
+          .describe('Language code for the item name and components (defaults to tenant language)'),
       },
       handler: async params => {
-        const { name, shapeIdentifier, parentPath, components, language } =
+        const { name, shapeIdentifier, parentPath, components } =
           params;
+        const language = (params.language as string) || defaultLang();
 
         // Validate shape exists and get its type + components
         const shapeQuery = `
@@ -231,7 +233,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
                 `Created ${itemType}: "${created.name}"`,
                 `  ID: ${created.id}`,
                 `  Path: ${path}`,
-                `  Link: ${client.itemLink(created.id, itemType, language)}`,
+                `  Edit: ${client.itemLink(created.id, itemType, language)}`,
                 `  Shape: ${client.shapeLink(shapeIdentifier, language)}`,
               ].join('\n'),
             },
@@ -266,10 +268,11 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             'Component ID to update — use get_shape to see available components',
           ),
         value: z.unknown().describe('New value for the component'),
-        language: z.string().default('en').describe('Language code'),
+        language: z.string().optional().describe('Language code (defaults to tenant language)'),
       },
       handler: async params => {
-        const { itemId, componentId, value, language } = params;
+        const { itemId, componentId, value } = params;
+        const language = (params.language as string) || defaultLang();
 
         // Fetch current item to get shape and current component value
         const itemQuery = `
@@ -355,7 +358,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             '',
             `Mutation: item.updateComponent(itemId: "${itemId}", language: "${language}", component: ${JSON.stringify(componentInput)})`,
             '',
-            `Link: ${client.itemLink(itemId, item.type, language)}`,
+            `Edit: ${client.itemLink(itemId, item.type, language)}`,
           ];
           return dryRunResult(lines);
         }
@@ -404,7 +407,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
                 `  Component: ${componentId} (${compDef.type})`,
                 `  Previous: ${currentValue}`,
                 `  New: ${JSON.stringify(value)}`,
-                `  Link: ${client.itemLink(itemId, item.type, language)}`,
+                `  Edit: ${client.itemLink(itemId, item.type, language)}`,
               ].join('\n'),
             },
           ],

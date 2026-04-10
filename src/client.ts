@@ -59,10 +59,49 @@ export class CrystallizeClient {
     return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/settings/shapes/${shapeIdentifier}`;
   }
 
+  /** Generate a full frontend URL for a catalogue path.
+   *  When draft is false, strip preview query params. */
+  catalogueLink(path: string, draft = false): string | null {
+    if (!this.config.frontendUrl) {
+      return null;
+    }
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    let url: string;
+    // Handle Crystallize {{itemPath}} template variable
+    if (this.config.frontendUrl.includes('{{itemPath}}')) {
+      url = this.config.frontendUrl.replace('{{itemPath}}', cleanPath);
+    } else {
+      const base = this.config.frontendUrl.replace(/\/+$/, '');
+      url = `${base}/${cleanPath}`;
+    }
+    if (!draft) {
+      // Strip ?preview=true or &preview=true from the URL
+      try {
+        const parsed = new URL(url);
+        parsed.searchParams.delete('preview');
+        url = parsed.toString();
+      } catch {
+        // If URL parsing fails, return as-is
+      }
+    }
+    return url;
+  }
+
+  /** Construct a Crystallize media CDN URL from an image/video key. */
+  mediaUrl(key: string): string {
+    return `https://media.crystallize.com/${this.config.tenantIdentifier}/${key}`;
+  }
+
   /** Generate a deep link to an order in the Crystallize UI. */
   orderLink(orderId: string, language?: string): string {
     const lang = language ?? this.config.defaultLanguage ?? 'en';
     return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/orders/${orderId}`;
+  }
+
+  /** Generate a deep link to a customer in the Crystallize UI. */
+  customerLink(identifier: string, language?: string): string {
+    const lang = language ?? this.config.defaultLanguage ?? 'en';
+    return `https://app.crystallize.com/@${this.config.tenantIdentifier}/${lang}/customers/${encodeURIComponent(identifier)}`;
   }
 
   /**
@@ -125,6 +164,34 @@ export class CrystallizeClient {
       client.config.tenantId ??= data.tenant.get.id;
       client.config.defaultLanguage ??=
         data.tenant.get.defaults?.language ?? 'en';
+    }
+
+    // Fetch frontend URL from Core API tenant preferences
+    if (!client.config.frontendUrl) {
+      try {
+        const feData = (await client.api.nextPimApi(
+          `query GetFrontends($identifier: String!) {
+            tenant(identifier: $identifier) {
+              ... on Tenant {
+                preferences { frontends { name url } }
+              }
+            }
+          }`,
+          { identifier: tenantIdentifier },
+        )) as {
+          tenant?: {
+            preferences?: {
+              frontends?: { name: string; url: string }[];
+            };
+          };
+        };
+        const frontends = feData.tenant?.preferences?.frontends;
+        if (frontends?.length) {
+          client.config.frontendUrl = frontends[0].url;
+        }
+      } catch {
+        // Non-critical — frontend links will just be omitted
+      }
     }
 
     return client;
