@@ -322,7 +322,7 @@ This is useful when:
 - **Your `.mcp.json` is committed to git** — keychain keeps tokens out of the repository
 - **You prefer not to have secrets in plain text config files** — the config only needs `CRYSTALLIZE_TENANT_IDENTIFIER`
 
-When using `--setup --global` with Claude Code, the wizard runs `claude mcp add` with only the non-secret env vars. Tokens are read from the keychain at runtime, so they never appear in the Claude Code config either.
+When using `--setup --global` with Claude Code, this applies only if keychain storage is available and you opt into it: in that case, the wizard runs `claude mcp add` with only the non-secret env vars, and tokens are read from the keychain at runtime so they do not appear in Claude Code config. If keychain storage is unavailable or you choose not to use it, the wizard passes token env vars to `claude mcp add`, and Claude Code may store them in plain text.
 
 ### Access mode
 
