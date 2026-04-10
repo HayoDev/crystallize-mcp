@@ -179,6 +179,7 @@ describe('schema introspection with mock API', () => {
 
     const text = result.content[0].text;
     assert.ok(text.includes('GraphQL Schema'));
+    assert.ok(text.includes('3 types'));
     assert.ok(text.includes('type Query'));
     assert.ok(text.includes('catalogue'));
     assert.ok(text.includes('type Item'));
@@ -317,7 +318,78 @@ describe('schema introspection with mock API', () => {
     const text = result.content[0].text;
     assert.ok(text.includes('OrderQueries'));
     assert.ok(text.includes('Query'));
+    // Filtered count: Query + OrderQueries = 2 of 3
+    assert.ok(text.includes('2 of 3 types'));
     // CustomerQueries should be filtered out
     assert.ok(!text.includes('CustomerQueries'));
+  });
+
+  it('auto-summarises when schema exceeds size threshold', async () => {
+    const client = new CrystallizeClient({
+      tenantIdentifier: 'test-tenant',
+      accessMode: 'read',
+    });
+
+    // Generate a schema large enough to exceed the 50k auto-summary threshold
+    const largeTypes = Array.from({ length: 200 }, (_, i) => ({
+      kind: 'OBJECT',
+      name: `GeneratedType${i}`,
+      fields: Array.from({ length: 20 }, (_, j) => ({
+        name: `field${j}WithALongNameToInflateSize`,
+        type: { kind: 'SCALAR', name: 'String', ofType: null },
+        args: [],
+      })),
+      inputFields: null,
+      enumValues: null,
+      possibleTypes: null,
+    }));
+
+    const mockLargeSchema = {
+      __schema: {
+        queryType: { name: 'Query' },
+        mutationType: null,
+        types: [
+          {
+            kind: 'OBJECT',
+            name: 'Query',
+            fields: [
+              {
+                name: 'test',
+                type: { kind: 'SCALAR', name: 'String', ofType: null },
+                args: [],
+              },
+            ],
+            inputFields: null,
+            enumValues: null,
+            possibleTypes: null,
+          },
+          ...largeTypes,
+        ],
+      },
+    };
+
+    Object.defineProperty(client.api, 'catalogueApi', {
+      value: async () => mockLargeSchema,
+      writable: true,
+      configurable: true,
+    });
+
+    const tools = schemaTools(client);
+    const fetchCatalogue = tools.find(t => t.name === 'fetch_catalogue_schema');
+    if (!fetchCatalogue) {
+      throw new Error('fetch_catalogue_schema not found');
+    }
+
+    const result = await fetchCatalogue.handler({});
+    assert.strictEqual(result.isError, undefined);
+
+    const text = result.content[0].text;
+    // Should auto-switch to summary mode
+    assert.ok(text.includes('Schema Summary'));
+    assert.ok(text.includes('full schema too large'));
+    assert.ok(text.includes('domain'));
+    // Summary lists type names, not full field definitions
+    assert.ok(text.includes('GeneratedType0'));
+    assert.ok(!text.includes('field0WithALongNameToInflateSize'));
   });
 });

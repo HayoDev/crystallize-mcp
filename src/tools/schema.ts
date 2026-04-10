@@ -141,7 +141,7 @@ function renderTypeRef(ref: TypeRef): string {
 function compactSchema(
   data: IntrospectionResult,
   options?: { domain?: string },
-): string {
+): { text: string; filteredCount: number; totalCount: number } {
   const schema = data.__schema;
   const lines: string[] = [];
 
@@ -191,7 +191,11 @@ function compactSchema(
     lines.push('');
   }
 
-  return lines.join('\n').trim();
+  return {
+    text: lines.join('\n').trim(),
+    filteredCount: filtered.length,
+    totalCount: types.length,
+  };
 }
 
 function isRootType(
@@ -299,7 +303,7 @@ async function introspect(
     query: string,
     variables?: Record<string, unknown>,
   ) => Promise<unknown>,
-  options?: { domain?: string; summary?: boolean },
+  options?: { domain?: string },
 ): Promise<ToolResult> {
   try {
     const data = (await apiCaller(INTROSPECTION_QUERY)) as IntrospectionResult;
@@ -316,26 +320,29 @@ async function introspect(
       };
     }
 
-    const typeCount = data.__schema.types.filter(
-      t => !BUILTIN_TYPES.has(t.name) && !t.name.startsWith('__'),
-    ).length;
-
-    const useSummary = options?.summary === true;
-    const compacted = useSummary
-      ? summariseSchema(data)
-      : compactSchema(data, options);
+    const {
+      text: compacted,
+      filteredCount,
+      totalCount,
+    } = compactSchema(data, options);
+    const countLabel =
+      filteredCount < totalCount
+        ? `${filteredCount} of ${totalCount} types`
+        : `${totalCount} types`;
 
     // Auto-switch to summary if full schema is too large
-    if (!useSummary && compacted.length > MAX_FULL_SCHEMA_LENGTH) {
+    if (compacted.length > MAX_FULL_SCHEMA_LENGTH) {
       const summary = summariseSchema(data);
       return {
         content: [
           {
             type: 'text',
             text: [
-              `# GraphQL Schema Summary (${typeCount} types — full schema too large at ${Math.round(compacted.length / 1000)}k chars)`,
+              `# GraphQL Schema Summary (${countLabel} — full schema too large at ${Math.round(compacted.length / 1000)}k chars)`,
               '',
-              'Use the `domain` parameter or `summary: true` to get a focused view.',
+              options?.domain
+                ? 'Try a more specific domain filter to get the full schema.'
+                : 'Use the `domain` parameter to get a focused view.',
               '',
               summary,
             ].join('\n'),
@@ -344,14 +351,11 @@ async function introspect(
       };
     }
 
-    const label = useSummary ? 'Summary' : 'Schema';
     return {
       content: [
         {
           type: 'text',
-          text: [`# GraphQL ${label} (${typeCount} types)`, '', compacted].join(
-            '\n',
-          ),
+          text: [`# GraphQL Schema (${countLabel})`, '', compacted].join('\n'),
         },
       ],
     };
@@ -390,22 +394,10 @@ export function schemaTools(client: CrystallizeClient): ToolDefinition[] {
         'Fetch the GraphQL schema of the Crystallize Discovery API. ' +
         'The Discovery API is a storefront API for searching, browsing, filtering, and faceting items. ' +
         'It uses a shape-typed schema where each shape in the tenant becomes a GraphQL type. ' +
-        'Use this to understand the tenant-specific types and available browse/search queries. ' +
-        'Set summary to true for large tenants to get a compact overview.',
-      schema: {
-        summary: z
-          .boolean()
-          .optional()
-          .describe(
-            'Return only root fields and type names instead of the full schema. Recommended for large tenants.',
-          ),
-      },
-      handler: async params => {
-        const summary =
-          typeof params.summary === 'boolean' ? params.summary : undefined;
-        return introspect(q => client.api.discoveryApi(q), {
-          summary,
-        });
+        'Use this to understand the tenant-specific types and available browse/search queries.',
+      schema: {},
+      handler: async () => {
+        return introspect(q => client.api.discoveryApi(q));
       },
     },
 
@@ -415,7 +407,7 @@ export function schemaTools(client: CrystallizeClient): ToolDefinition[] {
         'Fetch the GraphQL schema of the Crystallize Core API (admin API). ' +
         'The Core API is large, so provide a domain to filter the schema (e.g. "order", "customer", "item"). ' +
         'Common domains: order, customer, subscription, subscriptionPlan, pricelist, pipeline, flow, app, user, webhook, stockLocation. ' +
-        'Omit domain to get a summary of available types. Set summary to true for a compact overview.',
+        'Omit domain to get a summary of available types.',
       schema: {
         domain: z
           .string()
@@ -424,23 +416,14 @@ export function schemaTools(client: CrystallizeClient): ToolDefinition[] {
             'Filter schema to a specific domain (e.g. "order", "customer", "item"). ' +
               'Omit to get the full schema.',
           ),
-        summary: z
-          .boolean()
-          .optional()
-          .describe(
-            'Return only root fields and type names instead of the full schema.',
-          ),
       },
       handler: async params => {
         const domain =
           typeof params.domain === 'string'
             ? params.domain.toLowerCase()
             : undefined;
-        const summary =
-          typeof params.summary === 'boolean' ? params.summary : undefined;
         return introspect(q => client.api.nextPimApi(q), {
           domain,
-          summary,
         });
       },
     },
