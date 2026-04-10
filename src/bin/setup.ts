@@ -106,6 +106,15 @@ async function main() {
     dryRun = dryRunAnswer.toLowerCase() === 'y';
   }
 
+  // Audit log
+  console.error(
+    '\nAudit log records every tool call (timestamp, tool, params, result).',
+  );
+  console.error(
+    'Leave blank to disable, or enter a file path (~ is expanded).',
+  );
+  const auditLog = await ask('Audit log path', '~/.crystallize-mcp/audit.log');
+
   // Keychain offer — only if tokens were entered and keychain is reachable
   const hasSecrets = tokenId || tokenSecret || staticToken;
   let useKeychain = false;
@@ -138,7 +147,8 @@ async function main() {
     console.error('✅ Tokens saved to OS keychain.');
   }
 
-  // Build env config — omit secrets if stored in keychain
+  // Build env config — always write all vars so the config is self-documenting.
+  // Omit secrets if stored in keychain.
   const env: Record<string, string> = {
     CRYSTALLIZE_TENANT_IDENTIFIER: tenant,
   };
@@ -156,14 +166,11 @@ async function main() {
       env.CRYSTALLIZE_STATIC_AUTH_TOKEN = staticToken;
     }
   }
-  if (accessMode !== 'read') {
-    env.CRYSTALLIZE_ACCESS_MODE = accessMode;
-  }
-  if (piiMode !== 'full') {
-    env.CRYSTALLIZE_PII_MODE = piiMode;
-  }
-  if (dryRun) {
-    env.CRYSTALLIZE_DRY_RUN = 'true';
+  env.CRYSTALLIZE_ACCESS_MODE = accessMode;
+  env.CRYSTALLIZE_PII_MODE = piiMode;
+  env.CRYSTALLIZE_DRY_RUN = dryRun ? 'true' : 'false';
+  if (auditLog) {
+    env.CRYSTALLIZE_AUDIT_LOG = auditLog;
   }
 
   // Build MCP config entry
@@ -291,6 +298,9 @@ async function main() {
     console.error(
       'Dry-run: enabled (mutations will be previewed, not executed)',
     );
+  }
+  if (auditLog) {
+    console.error(`Audit log: ${auditLog}`);
   }
   console.error('');
 
