@@ -20,6 +20,7 @@ import { discoveryTools } from './tools/discovery.js';
 import { orderTools } from './tools/orders.js';
 import { customerTools } from './tools/customers.js';
 import { contentTools } from './tools/content.js';
+import { schemaTools } from './tools/schema.js';
 
 /** Access mode hierarchy: read < write < admin. */
 const ACCESS_LEVELS: Record<AccessMode, number> = {
@@ -58,6 +59,7 @@ export function createCrystallizeMcpServer(client?: CrystallizeClient): {
     ...orderTools(crystallize),
     ...customerTools(crystallize),
     ...contentTools(crystallize),
+    ...schemaTools(crystallize),
   ];
 
   // Audit logger — only active if CRYSTALLIZE_AUDIT_LOG is set
