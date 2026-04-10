@@ -93,7 +93,22 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
                   type
                   description
                   config {
-                    ... on ComponentConfig {
+                    ... on ContentChunkComponentConfig {
+                      repeatable
+                    }
+                    ... on SelectionComponentConfig {
+                      min
+                      max
+                    }
+                    ... on ItemRelationsComponentConfig {
+                      min
+                      max
+                    }
+                    ... on FilesComponentConfig {
+                      min
+                      max
+                    }
+                    ... on SingleLineComponentConfig {
                       min
                       max
                     }
@@ -104,6 +119,11 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
                   name
                   type
                   description
+                  config {
+                    ... on ContentChunkComponentConfig {
+                      repeatable
+                    }
+                  }
                 }
               }
             }
@@ -135,13 +155,25 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
           '',
         ];
 
+        const formatComponent = (comp: ComponentDetail, indent = '  ') => {
+          const parts: string[] = [];
+          let label = `${indent}${comp.id} — ${comp.name} [${comp.type}]`;
+          if (comp.type === 'contentChunk' && comp.config) {
+            const repeatable = (comp.config as { repeatable?: boolean })
+              .repeatable;
+            label += repeatable ? ' (repeatable: YES)' : ' (repeatable: no)';
+          }
+          parts.push(label);
+          if (comp.description) {
+            parts.push(`${indent}  ${comp.description}`);
+          }
+          return parts;
+        };
+
         if (shape.components?.length) {
           lines.push(`Item Components (${shape.components.length}):`);
           for (const comp of shape.components) {
-            lines.push(`  ${comp.id} — ${comp.name} [${comp.type}]`);
-            if (comp.description) {
-              lines.push(`    ${comp.description}`);
-            }
+            lines.push(...formatComponent(comp));
           }
           lines.push('');
         }
@@ -149,10 +181,7 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         if (shape.variantComponents?.length) {
           lines.push(`Variant Components (${shape.variantComponents.length}):`);
           for (const comp of shape.variantComponents) {
-            lines.push(`  ${comp.id} — ${comp.name} [${comp.type}]`);
-            if (comp.description) {
-              lines.push(`    ${comp.description}`);
-            }
+            lines.push(...formatComponent(comp));
           }
         }
 

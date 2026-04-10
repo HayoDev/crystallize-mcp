@@ -87,16 +87,27 @@ function contentToInput(
   content: Record<string, unknown> | null | undefined,
 ): ComponentInput | null {
   const base = { componentId };
+
+  // Empty content — preserve as empty component rather than dropping
   if (!content) {
-    return null;
+    switch (componentType) {
+      case 'singleLine':
+        return { ...base, singleLine: { text: '' } };
+      case 'richText':
+        return null;
+      case 'boolean':
+        return null;
+      default:
+        return null;
+    }
   }
 
   switch (componentType) {
     case 'singleLine': {
-      if (content.text == null) {
-        return null;
-      }
-      return { ...base, singleLine: { text: String(content.text) } };
+      return {
+        ...base,
+        singleLine: { text: content.text != null ? String(content.text) : '' },
+      };
     }
     case 'richText': {
       if (content.json != null) {
@@ -367,7 +378,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'update_component',
       description:
-        'Update a single component on a catalogue item. Supports nested components inside content chunks using dot notation (e.g. "image-and-title.title"). Use get_item to see current values and get_shape to understand component types. Respects CRYSTALLIZE_DRY_RUN — when enabled, returns a before/after preview without changing anything.',
+        'Update a single component on a catalogue item. Supports nested components inside content chunks using dot notation (e.g. "image-and-title.title"). For repeating content chunks, use rowIndex to target a specific row (0 = first row). Use get_item to see current values and get_shape to understand component types. Respects CRYSTALLIZE_DRY_RUN — when enabled, returns a before/after preview without changing anything.',
       mode: 'write',
       schema: {
         itemId: z
@@ -380,12 +391,22 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           .describe(
             'Component ID to update. For nested components inside content chunks, use dot notation: "chunkId.childId" (e.g. "image-and-title.title")',
           ),
+        rowIndex: z
+          .number()
+          .int()
+          .min(0)
+          .default(0)
+          .describe(
+            'For repeating content chunks: 0-based row index to update (default: 0 = first row)',
+          ),
         value: z.unknown().describe('New value for the component'),
         language: z.string().default('en').describe('Language code'),
       },
       handler: async params => {
         const { itemId, value, language } = params;
         const componentId = String(params.componentId);
+        const rowIndex =
+          typeof params.rowIndex === 'number' ? params.rowIndex : 0;
 
         // Parse dot notation for nested components
         const parts = componentId.split('.');
@@ -518,7 +539,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         if (childId) {
           // For chunk children: fetch existing siblings via PIM API,
           // extract previous value from the target child, and merge
-          let allChunkChildren: ComponentInput[] = [innerInput];
+          let allRows: ComponentInput[][] = [[innerInput]];
           try {
             const chunkQuery = `
               query GetChunkContent($id: ID!, $language: String!) {
@@ -557,55 +578,93 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             const chunkComp = components.find(
               (c: { componentId: string }) => c.componentId === topLevelId,
             );
-            const firstRow = chunkComp?.content?.chunks?.[0];
-            if (firstRow) {
-              // Extract the current value from the target child
-              const targetChild = firstRow.find(
-                (c: ChunkChild) => c.componentId === childId,
-              );
-              if (targetChild?.content) {
-                currentValue = formatContentValue(targetChild.content);
-              }
+            const allChunkRows: ChunkChild[][] =
+              chunkComp?.content?.chunks ?? [];
 
-              let foundTarget = false;
-              const merged: ComponentInput[] = [];
-              for (const c of firstRow) {
-                if (c.componentId === childId) {
-                  foundTarget = true;
-                  merged.push(innerInput);
-                  continue;
-                }
-                const siblingInput = contentToInput(
-                  c.componentId,
-                  c.type,
-                  c.content,
-                );
-                if (siblingInput === null) {
-                  return {
-                    content: [
-                      {
-                        type: 'text',
-                        text: `Cannot update "${childId}" in chunk "${topLevelId}": sibling "${c.componentId}" has unsupported type "${c.type}". Updating would wipe that sibling's data.`,
-                      },
-                    ],
-                    isError: true,
-                  };
-                }
-                merged.push(siblingInput);
+            if (rowIndex >= allChunkRows.length && allChunkRows.length > 0) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `Row index ${rowIndex} is out of bounds — chunk "${topLevelId}" has ${allChunkRows.length} row(s) (0-based). Use get_item to inspect the chunk.`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+
+            const targetRow = allChunkRows[rowIndex] ?? [];
+
+            // Extract current value from the target child in the target row
+            const targetChild = targetRow.find(
+              (c: ChunkChild) => c.componentId === childId,
+            );
+            if (targetChild?.content) {
+              currentValue = formatContentValue(targetChild.content);
+            }
+
+            // Merge siblings in the target row, replacing only the target child
+            let foundTarget = false;
+            const mergedRow: ComponentInput[] = [];
+            for (const c of targetRow) {
+              if (c.componentId === childId) {
+                foundTarget = true;
+                mergedRow.push(innerInput);
+                continue;
               }
-              if (!foundTarget) {
-                merged.push(innerInput);
+              const siblingInput = contentToInput(
+                c.componentId,
+                c.type,
+                c.content,
+              );
+              if (siblingInput === null) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Cannot update "${childId}" in chunk "${topLevelId}" row ${rowIndex}: sibling "${c.componentId}" has unsupported type "${c.type}". Updating would wipe that sibling's data.`,
+                    },
+                  ],
+                  isError: true,
+                };
               }
-              allChunkChildren = merged;
+              mergedRow.push(siblingInput);
+            }
+            if (!foundTarget) {
+              mergedRow.push(innerInput);
+            }
+
+            // Rebuild all rows, replacing only the target row
+            allRows = allChunkRows.map((row, i) => {
+              if (i === rowIndex) {
+                return mergedRow;
+              }
+              return row
+                .map((c: ChunkChild) =>
+                  contentToInput(c.componentId, c.type, c.content),
+                )
+                .filter((x): x is ComponentInput => x !== null);
+            });
+            // If rowIndex is beyond existing rows, append
+            if (rowIndex >= allChunkRows.length) {
+              allRows.push(mergedRow);
             }
           } catch {
-            // Non-critical — fall back to sending only the target child
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Failed to fetch existing chunk data for "${topLevelId}". Cannot safely update "${childId}" without knowing sibling values — proceeding would risk wiping sibling components.`,
+                },
+              ],
+              isError: true,
+            };
           }
 
           componentInput = {
             componentId: topLevelId,
             contentChunk: {
-              chunks: [allChunkChildren],
+              chunks: allRows,
             },
           };
         } else {
@@ -614,9 +673,9 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           if (itemPath) {
             try {
               const catQuery = `
-                query GetComponentValue($path: String!, $language: String!) {
+                query GetComponentValue($path: String!, $language: String!, $componentId: String!) {
                   catalogue(path: $path, language: $language) {
-                    component(id: "${topLevelId}") {
+                    component(id: $componentId) {
                       content {
                         ... on SingleLineContent { text }
                         ... on RichTextContent { plainText }
@@ -631,6 +690,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
               const catData = (await client.api.catalogueApi(catQuery, {
                 path: itemPath,
                 language,
+                componentId: topLevelId,
               })) as CatalogueComponentResponse;
               const content = catData.catalogue?.component?.content;
               if (content) {
@@ -648,7 +708,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           const lines = [
             `Would update component on: "${item.name}" (${item.type})`,
             `  Item ID: ${itemId}`,
-            `  Component: ${targetName} (${componentId}, type: ${targetType})`,
+            `  Component: ${targetName} (${componentId}, type: ${targetType})${childId ? `, row: ${rowIndex}` : ''}`,
             `  Language: ${language}`,
             '',
             `Current value: ${currentValue}`,
@@ -701,7 +761,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
               type: 'text',
               text: [
                 `Updated "${targetName}" on "${item.name}"`,
-                `  Component: ${componentId} (${targetType})`,
+                `  Component: ${componentId} (${targetType})${childId ? `, row: ${rowIndex}` : ''}`,
                 `  Previous: ${currentValue}`,
                 `  New: ${JSON.stringify(value)}`,
                 `  Link: ${client.itemLink(itemId, item.type, language)}`,
