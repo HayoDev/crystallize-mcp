@@ -18,17 +18,21 @@ import {
 // --- PIM introspection (delegates to shared engine) ---
 
 function introspectPim(client: CrystallizeClient): Promise<ApiSchema> {
-  return introspectApi(
-    'pim',
-    (q, v) => client.api.pimApi(q, v ?? {}),
-    [['shape', 'get'], ['shape', 'getMany'], ['tenant', 'get']],
-  );
+  return introspectApi('pim', (q, v) => client.api.pimApi(q, v ?? {}), [
+    ['shape', 'get'],
+    ['shape', 'getMany'],
+    ['tenant', 'get'],
+  ]);
 }
 
 // --- Config formatting ---
 
 /** Extract and format relevant config properties from a component. */
-function formatComponentConfig(comp: any, lines: string[], indent: string): void {
+function formatComponentConfig(
+  comp: any,
+  lines: string[],
+  indent: string,
+): void {
   const config = comp.config;
   if (!config || typeof config !== 'object') {
     return;
@@ -53,7 +57,9 @@ function formatComponentConfig(comp: any, lines: string[], indent: string): void
     props.push(`maxItems: ${config.maxItems}`);
   }
   if (config.acceptedContentTypes) {
-    props.push(`acceptedContentTypes: ${JSON.stringify(config.acceptedContentTypes)}`);
+    props.push(
+      `acceptedContentTypes: ${JSON.stringify(config.acceptedContentTypes)}`,
+    );
   }
 
   // Show any remaining scalar config values we haven't listed
@@ -62,7 +68,14 @@ function formatComponentConfig(comp: any, lines: string[], indent: string): void
       value !== null &&
       value !== undefined &&
       typeof value !== 'object' &&
-      !['repeatable', 'min', 'max', 'minItems', 'maxItems', 'acceptedContentTypes'].includes(key)
+      ![
+        'repeatable',
+        'min',
+        'max',
+        'minItems',
+        'maxItems',
+        'acceptedContentTypes',
+      ].includes(key)
     ) {
       props.push(`${key}: ${value}`);
     }
@@ -78,7 +91,9 @@ function formatComponentConfig(comp: any, lines: string[], indent: string): void
     const label = config.components ? 'Nested components' : 'Choices';
     lines.push(`${indent}${label}:`);
     for (const sub of nested) {
-      lines.push(`${indent}  ${sub.id ?? sub.name ?? '?'} — ${sub.name ?? ''} [${sub.type ?? '?'}]`);
+      lines.push(
+        `${indent}  ${sub.id ?? sub.name ?? '?'} — ${sub.name ?? ''} [${sub.type ?? '?'}]`,
+      );
       if (sub.description) {
         lines.push(`${indent}    ${sub.description}`);
       }
@@ -104,8 +119,12 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         const schema = await introspectPim(client);
 
         const data = (await execNestedWithRetry(
-          pimCall, schema, 'shape', 'getMany',
-          { tenantId: client.config.tenantId }, 1,
+          pimCall,
+          schema,
+          'shape',
+          'getMany',
+          { tenantId: client.config.tenantId },
+          1,
         )) as any;
 
         const shapes = data.shape?.getMany as any[] | undefined;
@@ -156,8 +175,12 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         const schema = await introspectPim(client);
 
         const data = (await execNestedWithRetry(
-          pimCall, schema, 'shape', 'get',
-          { identifier, tenantId: client.config.tenantId }, 2,
+          pimCall,
+          schema,
+          'shape',
+          'get',
+          { identifier, tenantId: client.config.tenantId },
+          2,
         )) as any;
 
         const shape = data.shape?.get;
@@ -220,8 +243,12 @@ export function shapeTools(client: CrystallizeClient): ToolDefinition[] {
         const schema = await introspectPim(client);
 
         const data = (await execNestedWithRetry(
-          pimCall, schema, 'tenant', 'get',
-          { identifier: client.config.tenantIdentifier }, 1,
+          pimCall,
+          schema,
+          'tenant',
+          'get',
+          { identifier: client.config.tenantIdentifier },
+          1,
         )) as any;
 
         const tenant = data.tenant?.get;

@@ -135,7 +135,13 @@ export async function introspectApi(
   // Step 2: Find shallow types along the seed paths
   const typesToDeepen = new Set<string>();
   for (const path of seedPaths) {
-    collectShallowTypesAlongPath(types, data.__schema.queryType.name, path, typesToDeepen, 3);
+    collectShallowTypesAlongPath(
+      types,
+      data.__schema.queryType.name,
+      path,
+      typesToDeepen,
+      3,
+    );
   }
 
   // Step 2b: Batch-fetch detailed fields for shallow types
@@ -288,11 +294,11 @@ export function getRootFieldReturnType(
   fieldName: string,
 ): IntroType | undefined {
   const q = schema.types.get(schema.queryTypeName);
-  const f = q?.fields?.find(f => f.name === fieldName);
-  if (!f) {
+  const field = q?.fields?.find(f => f.name === fieldName);
+  if (!field) {
     return undefined;
   }
-  return schema.types.get(resolveTypeName(f.type));
+  return schema.types.get(resolveTypeName(field.type));
 }
 
 /** Get args for a root-level field. */
@@ -301,8 +307,8 @@ export function getRootFieldArgs(
   fieldName: string,
 ): { name: string; gqlType: string }[] {
   const q = schema.types.get(schema.queryTypeName);
-  const f = q?.fields?.find(f => f.name === fieldName);
-  return (f?.args ?? []).map(a => ({
+  const field = q?.fields?.find(f => f.name === fieldName);
+  return (field?.args ?? []).map(a => ({
     name: a.name,
     gqlType: renderTypeRef(a.type),
   }));
@@ -385,7 +391,13 @@ export function buildSelection(
       const nested = schema.types.get(typeName);
 
       if (nested?.kind === 'OBJECT' && nested.fields?.length) {
-        const sub = buildSelection(schema, nested, depth - 1, new Set(visited), skipFields);
+        const sub = buildSelection(
+          schema,
+          nested,
+          depth - 1,
+          new Set(visited),
+          skipFields,
+        );
         if (sub) {
           parts.push(`${field.name} { ${sub} }`);
         }
@@ -393,7 +405,12 @@ export function buildSelection(
         (nested?.kind === 'UNION' || nested?.kind === 'INTERFACE') &&
         nested.possibleTypes?.length
       ) {
-        const fragments = buildUnionFragments(schema, nested, depth - 1, new Set(visited));
+        const fragments = buildUnionFragments(
+          schema,
+          nested,
+          depth - 1,
+          new Set(visited),
+        );
         if (fragments) {
           parts.push(`${field.name} { ${fragments} }`);
         }
@@ -413,7 +430,7 @@ export function buildUnionFragments(
   schema: ApiSchema,
   unionType: IntroType,
   depth: number,
-  visited: Set<string>,
+  _visited: Set<string>,
 ): string {
   const members = (unionType.possibleTypes ?? [])
     .map(m => schema.types.get(m.name))
@@ -442,7 +459,13 @@ export function buildUnionFragments(
     // would incorrectly block self-referential types (e.g. Component → content
     // → ContentChunkContent → chunks → Component). The finite depth parameter
     // is sufficient to prevent infinite recursion.
-    const sub = buildSelectionExcluding(schema, member, depth, new Set(), conflicting);
+    const sub = buildSelectionExcluding(
+      schema,
+      member,
+      depth,
+      new Set(),
+      conflicting,
+    );
     if (sub) {
       fragments.push(`... on ${member.name} { ${sub} }`);
     }
@@ -488,7 +511,12 @@ function buildSelectionExcluding(
         (nested?.kind === 'UNION' || nested?.kind === 'INTERFACE') &&
         nested.possibleTypes?.length
       ) {
-        const fragments = buildUnionFragments(schema, nested, depth - 1, new Set(visited));
+        const fragments = buildUnionFragments(
+          schema,
+          nested,
+          depth - 1,
+          new Set(visited),
+        );
         if (fragments) {
           parts.push(`${field.name} { ${fragments} }`);
         }
@@ -516,7 +544,13 @@ export function buildNestedQuery(
     throw new Error(`Cannot introspect ${rootField}.${subField}`);
   }
 
-  const selection = buildSelection(schema, returnType, depth, new Set(), skipFields);
+  const selection = buildSelection(
+    schema,
+    returnType,
+    depth,
+    new Set(),
+    skipFields,
+  );
   const args = getNestedFieldArgs(schema, rootField, subField);
 
   const varDecls = args.map(a => `$${a.name}: ${a.gqlType}`).join(', ');
@@ -544,7 +578,13 @@ export function buildRootQuery(
     throw new Error(`Cannot introspect root field "${rootField}"`);
   }
 
-  let selection = buildSelection(schema, returnType, depth, new Set(), skipFields);
+  let selection = buildSelection(
+    schema,
+    returnType,
+    depth,
+    new Set(),
+    skipFields,
+  );
 
   // For INTERFACE return types, add inline fragments for each implementor
   if (returnType.kind === 'INTERFACE' && returnType.possibleTypes?.length) {
@@ -592,7 +632,13 @@ export async function execNestedWithRetry(
   const maxRetries = 3;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const query = buildNestedQuery(schema, rootField, subField, depth, skipFields);
+    const query = buildNestedQuery(
+      schema,
+      rootField,
+      subField,
+      depth,
+      skipFields,
+    );
     try {
       return await apiCall(query, variables);
     } catch (err: any) {
@@ -619,7 +665,13 @@ export async function execRootWithRetry(
   const maxRetries = 3;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const query = buildRootQuery(schema, rootField, depth, skipFields, extraSelection);
+    const query = buildRootQuery(
+      schema,
+      rootField,
+      depth,
+      skipFields,
+      extraSelection,
+    );
     try {
       return await apiCall(query, variables);
     } catch (err: any) {

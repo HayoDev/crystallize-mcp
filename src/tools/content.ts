@@ -100,11 +100,12 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         language: z
           .string()
           .optional()
-          .describe('Language code for the item name and components (defaults to tenant language)'),
+          .describe(
+            'Language code for the item name and components (defaults to tenant language)',
+          ),
       },
       handler: async params => {
-        const { name, shapeIdentifier, parentPath, components } =
-          params;
+        const { name, shapeIdentifier, parentPath, components } = params;
         const language = (params.language as string) || defaultLang();
 
         // Validate shape exists and get its type + components
@@ -268,7 +269,10 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             'Component ID to update — use get_shape to see available components',
           ),
         value: z.unknown().describe('New value for the component'),
-        language: z.string().optional().describe('Language code (defaults to tenant language)'),
+        language: z
+          .string()
+          .optional()
+          .describe('Language code (defaults to tenant language)'),
       },
       handler: async params => {
         const { itemId, componentId, value } = params;

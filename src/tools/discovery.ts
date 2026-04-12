@@ -365,17 +365,33 @@ function formatNestedObject(obj: Record<string, unknown>): string {
   const name = obj.name as string | undefined;
   const path = obj.path as string | undefined;
   const url = obj.url as string | undefined;
-  if (name && path) {return `${name} (${path})`;}
-  if (name && url) {return `${name} — ${url}`;}
-  if (url) {return String(url);}
-  if (name) {return String(name);}
-  if (path) {return String(path);}
+  if (name && path) {
+    return `${name} (${path})`;
+  }
+  if (name && url) {
+    return `${name} — ${url}`;
+  }
+  if (url) {
+    return String(url);
+  }
+  if (name) {
+    return String(name);
+  }
+  if (path) {
+    return String(path);
+  }
 
   // Fallback: list scalar fields inline
   const parts: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
-    if (v === null || v === undefined) {continue;}
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+    if (v === null || v === undefined) {
+      continue;
+    }
+    if (
+      typeof v === 'string' ||
+      typeof v === 'number' ||
+      typeof v === 'boolean'
+    ) {
       parts.push(`${k}: ${v}`);
     }
   }
@@ -423,7 +439,9 @@ function formatBrowseResult(
         );
         lines.push(`  ${key}: ${items.join(', ')}`);
       } else if (typeof value === 'object') {
-        lines.push(`  ${key}: ${formatNestedObject(value as Record<string, unknown>)}`);
+        lines.push(
+          `  ${key}: ${formatNestedObject(value as Record<string, unknown>)}`,
+        );
       }
     }
 

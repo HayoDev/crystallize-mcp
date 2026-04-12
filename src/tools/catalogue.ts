@@ -23,11 +23,10 @@ import {
 // --- Catalogue API introspection ---
 
 function introspectCatalogue(client: CrystallizeClient): Promise<ApiSchema> {
-  return introspectApi(
-    'catalogue',
-    (q, v) => client.api.catalogueApi(q, v),
-    [['catalogue'], ['search']],
-  );
+  return introspectApi('catalogue', (q, v) => client.api.catalogueApi(q, v), [
+    ['catalogue'],
+    ['search'],
+  ]);
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,7 +45,10 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           .string()
           .default('/')
           .describe('Catalogue path to browse, e.g. "/" or "/shop/plants"'),
-        language: z.string().optional().describe('Language code (defaults to tenant language)'),
+        language: z
+          .string()
+          .optional()
+          .describe('Language code (defaults to tenant language)'),
         depth: z
           .number()
           .default(1)
@@ -61,15 +63,25 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         // Build a children fragment dynamically based on introspected schema.
         // The catalogue root returns an Item interface; children is a field on Item.
         const itemType = getRootFieldReturnType(schema, 'catalogue');
-        const childrenField = itemType?.fields?.find(f => f.name === 'children');
+        const childrenField = itemType?.fields?.find(
+          f => f.name === 'children',
+        );
         let childrenFragment = '';
         if (childrenField && itemType) {
-          childrenFragment = buildChildrenFromSchema(schema, itemType, clampedDepth);
+          childrenFragment = buildChildrenFromSchema(
+            schema,
+            itemType,
+            clampedDepth,
+          );
         }
 
         const data = (await execRootWithRetry(
-          catCall, schema, 'catalogue',
-          { path, language }, 1, childrenFragment,
+          catCall,
+          schema,
+          'catalogue',
+          { path, language },
+          1,
+          childrenFragment,
         )) as any;
 
         const catalogue = data?.catalogue;
@@ -96,7 +108,10 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         'Get a catalogue item by path with its full component data. Returns name, type, shape, components, and a deep link to the Crystallize UI.',
       schema: {
         path: z.string().describe('Item path, e.g. "/shop/plants/monstera"'),
-        language: z.string().optional().describe('Language code (defaults to tenant language)'),
+        language: z
+          .string()
+          .optional()
+          .describe('Language code (defaults to tenant language)'),
       },
       handler: async params => {
         const path = params.path as string;
@@ -111,8 +126,11 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           `... on Product { defaultVariant { sku name price stock } }`,
         ].join(' ');
         const data = (await execRootWithRetry(
-          catCall, schema, 'catalogue',
-          { path, language }, 1,
+          catCall,
+          schema,
+          'catalogue',
+          { path, language },
+          1,
           extraSel,
         )) as any;
 
@@ -155,7 +173,10 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
             `;
 
             try {
-              const chunkData = (await catCall(chunkQuery, { path, language })) as any;
+              const chunkData = (await catCall(chunkQuery, {
+                path,
+                language,
+              })) as any;
               const deepComponents = chunkData?.catalogue?.components ?? [];
 
               // Merge chunk data back into the shallow components
@@ -200,11 +221,19 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         if (item.defaultVariant) {
           const dv = item.defaultVariant;
           const variantParts: string[] = [];
-          if (dv.sku) {variantParts.push(`SKU: ${dv.sku}`);}
-          if (dv.price != null) {variantParts.push(`Price: ${dv.price}`);}
-          if (dv.stock != null) {variantParts.push(`Stock: ${dv.stock}`);}
+          if (dv.sku) {
+            variantParts.push(`SKU: ${dv.sku}`);
+          }
+          if (dv.price != null) {
+            variantParts.push(`Price: ${dv.price}`);
+          }
+          if (dv.stock != null) {
+            variantParts.push(`Stock: ${dv.stock}`);
+          }
           if (variantParts.length) {
-            lines.push(`  Default variant: ${dv.name ?? dv.sku} — ${variantParts.join(', ')}`);
+            lines.push(
+              `  Default variant: ${dv.name ?? dv.sku} — ${variantParts.join(', ')}`,
+            );
           }
         }
 
@@ -216,9 +245,7 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
             if (isEmptyValue(val)) {
               emptyIds.push(comp.id);
             } else {
-              nonEmpty.push(
-                `  ${comp.id} (${comp.type}): ${val}`,
-              );
+              nonEmpty.push(`  ${comp.id} (${comp.type}): ${val}`);
             }
           }
           if (nonEmpty.length) {
@@ -226,7 +253,10 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
             lines.push(...nonEmpty);
           }
           if (emptyIds.length) {
-            lines.push('', `Empty components (${emptyIds.length}): ${emptyIds.join(', ')}`);
+            lines.push(
+              '',
+              `Empty components (${emptyIds.length}): ${emptyIds.join(', ')}`,
+            );
           }
         }
 
@@ -246,9 +276,15 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
           .enum(['PRODUCT', 'DOCUMENT', 'FOLDER'])
           .optional()
           .describe('Filter by item type'),
-        language: z.string().optional().describe('Language code (defaults to tenant language)'),
+        language: z
+          .string()
+          .optional()
+          .describe('Language code (defaults to tenant language)'),
         limit: z.number().default(20).describe('Max results to return'),
-        after: z.string().optional().describe('Pagination cursor from a previous search result'),
+        after: z
+          .string()
+          .optional()
+          .describe('Pagination cursor from a previous search result'),
       },
       handler: async params => {
         const { term, type, limit, after } = params;
@@ -302,7 +338,9 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         `;
 
         const variables: Record<string, unknown> = { term, language };
-        if (after) {variables.after = after;}
+        if (after) {
+          variables.after = after;
+        }
 
         const response = await fetch(
           `https://api.crystallize.com/${client.config.tenantIdentifier}/search`,
@@ -372,7 +410,10 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         'Get all variants for a product by path. Returns SKUs, names, pricing, stock, and attributes.',
       schema: {
         path: z.string().describe('Product path, e.g. "/shop/plants/monstera"'),
-        language: z.string().optional().describe('Language code (defaults to tenant language)'),
+        language: z
+          .string()
+          .optional()
+          .describe('Language code (defaults to tenant language)'),
       },
       handler: async params => {
         const path = params.path as string;
@@ -385,7 +426,9 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         const productType = schema.types.get('Product');
         let variantFragment = '';
         if (productType) {
-          const variantsField = productType.fields?.find(f => f.name === 'variants');
+          const variantsField = productType.fields?.find(
+            f => f.name === 'variants',
+          );
           if (variantsField) {
             const variantTypeName = resolveTypeNameFromField(variantsField);
             const variantType = schema.types.get(variantTypeName);
@@ -399,8 +442,12 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         const data = (await execRootWithRetry(
-          catCall, schema, 'catalogue',
-          { path, language }, 1, variantFragment,
+          catCall,
+          schema,
+          'catalogue',
+          { path, language },
+          1,
+          variantFragment,
         )) as any;
 
         const product = data?.catalogue;
@@ -460,7 +507,9 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
 // --- Helpers ---
 
 /** Resolve the named type from a field's type ref. */
-function resolveTypeNameFromField(field: { type: { kind: string; name?: string | null; ofType?: any } }): string {
+function resolveTypeNameFromField(field: {
+  type: { kind: string; name?: string | null; ofType?: any };
+}): string {
   return resolveTypeName(field.type);
 }
 
@@ -536,7 +585,10 @@ function buildShallowComponentContent(schema: ApiSchema): string {
             } else {
               // Second level: only scalars
               const deep = schema.types.get(resolveTypeName(sub.type));
-              if ((deep?.kind === 'OBJECT' || deep?.kind === 'INTERFACE') && deep.fields?.length) {
+              if (
+                (deep?.kind === 'OBJECT' || deep?.kind === 'INTERFACE') &&
+                deep.fields?.length
+              ) {
                 const deepScalars = deep.fields
                   .filter(f => isScalar(f.type) && !hasRequiredArgs(f))
                   .map(f => f.name);
@@ -569,11 +621,13 @@ function buildShallowComponentContent(schema: ApiSchema): string {
   ];
   for (const holder of componentHolders) {
     const idx = fragments.findIndex(f => f.includes(holder.type));
-    if (idx < 0) {continue;}
-    const otherFragments = fragments
-      .filter((_, i) => i !== idx)
-      .join(' ');
-    if (!otherFragments) {continue;}
+    if (idx < 0) {
+      continue;
+    }
+    const otherFragments = fragments.filter((_, i) => i !== idx).join(' ');
+    if (!otherFragments) {
+      continue;
+    }
     const fieldRe = new RegExp(`${holder.field}\\s*\\{[^}]*\\}`);
     fragments[idx] = fragments[idx].replace(
       fieldRe,
@@ -621,18 +675,25 @@ function buildChildrenFromSchema(
   // Build a minimal selection for children: scalars only + recurse
   const scalarFields = (itemType.fields ?? [])
     .filter(f => {
-      const k = f.type.kind === 'NON_NULL' || f.type.kind === 'LIST'
-        ? f.type.ofType?.kind ?? f.type.kind
-        : f.type.kind;
+      const k =
+        f.type.kind === 'NON_NULL' || f.type.kind === 'LIST'
+          ? (f.type.ofType?.kind ?? f.type.kind)
+          : f.type.kind;
       return k === 'SCALAR' || k === 'ENUM';
     })
     .map(f => f.name);
 
   // Ensure essential fields are included
   const essentials = ['id', 'name', 'type', 'path'];
-  const fields = [...new Set([...essentials.filter(e => scalarFields.includes(e)), ...scalarFields.slice(0, 6)])];
+  const fields = [
+    ...new Set([
+      ...essentials.filter(e => scalarFields.includes(e)),
+      ...scalarFields.slice(0, 6),
+    ]),
+  ];
 
-  const inner = depth > 1 ? buildChildrenFromSchema(schema, itemType, depth - 1) : '';
+  const inner =
+    depth > 1 ? buildChildrenFromSchema(schema, itemType, depth - 1) : '';
   return `children { ${fields.join(' ')} ${inner} }`;
 }
 
@@ -702,7 +763,11 @@ function formatComponentContent(
 
   // ImageContent
   if ('images' in content || 'firstImage' in content) {
-    let images = (content.images ?? []) as { url?: string; key?: string; altText?: string }[];
+    let images = (content.images ?? []) as {
+      url?: string;
+      key?: string;
+      altText?: string;
+    }[];
     // Fallback to firstImage if images array is empty
     if (!images.length && (content as any).firstImage) {
       images = [(content as any).firstImage];
@@ -710,15 +775,24 @@ function formatComponentContent(
     if (!images.length) {
       return '(no images)';
     }
-    return images.map(img => {
-      const url = img.url || (img.key && client ? client.mediaUrl(img.key) : null);
-      return url ?? img.altText ?? img.key ?? 'image';
-    }).join(', ');
+    return images
+      .map(img => {
+        const url =
+          img.url || (img.key && client ? client.mediaUrl(img.key) : null);
+        return url ?? img.altText ?? img.key ?? 'image';
+      })
+      .join(', ');
   }
 
   // VideoContent
   if ('videos' in content || 'firstVideo' in content) {
-    let videos = ((content.videos ?? []) as { id?: string; title?: string; key?: string; playlists?: string[]; thumbnails?: { url: string }[] }[]);
+    let videos = (content.videos ?? []) as {
+      id?: string;
+      title?: string;
+      key?: string;
+      playlists?: string[];
+      thumbnails?: { url: string }[];
+    }[];
     // Fallback to firstVideo if videos array is empty
     if (!videos.length && (content as any).firstVideo) {
       videos = [(content as any).firstVideo];
@@ -726,18 +800,25 @@ function formatComponentContent(
     if (!videos.length) {
       return '(no videos)';
     }
-    return videos.map(v => {
-      const url = v.playlists?.length
-        ? v.playlists[v.playlists.length - 1]
-        : v.thumbnails?.[0]?.url
-          ?? (v.key && client ? client.mediaUrl(v.key) : null);
-      return url ?? v.title ?? v.id ?? 'video';
-    }).join(', ');
+    return videos
+      .map(v => {
+        const url = v.playlists?.length
+          ? v.playlists[v.playlists.length - 1]
+          : (v.thumbnails?.[0]?.url ??
+            (v.key && client ? client.mediaUrl(v.key) : null));
+        return url ?? v.title ?? v.id ?? 'video';
+      })
+      .join(', ');
   }
 
   // FileContent
   if ('files' in content) {
-    const files = content.files as { url: string; key?: string; title?: string; size?: number }[];
+    const files = content.files as {
+      url: string;
+      key?: string;
+      title?: string;
+      size?: number;
+    }[];
     if (!files?.length) {
       return '(no files)';
     }
@@ -757,7 +838,10 @@ function formatComponentContent(
 
   // PropertiesTableContent
   if ('sections' in content) {
-    const sections = content.sections as { title?: string; properties?: { key: string; value?: string }[] }[];
+    const sections = content.sections as {
+      title?: string;
+      properties?: { key: string; value?: string }[];
+    }[];
     if (!sections?.length) {
       return '(empty properties)';
     }
@@ -781,26 +865,36 @@ function formatComponentContent(
 
   // ItemRelationsContent / GridRelationsContent
   if ('items' in content) {
-    const items = content.items as { id?: string; name: string; path: string; type: string }[] | null;
-    const variants = content.productVariants as { id?: string; name: string; sku: string }[] | null;
+    const items = content.items as
+      | { id?: string; name: string; path: string; type: string }[]
+      | null;
+    const variants = content.productVariants as
+      | { id?: string; name: string; sku: string }[]
+      | null;
     const parts: string[] = [];
     if (items?.length) {
-      parts.push(items.map(item => {
-        const lines: string[] = [];
-        lines.push(`${item.name} [${item.type}]`);
-        // Crystallize edit deeplink
-        if (item.id && client) {
-          lines.push(`Edit: ${client.itemLink(item.id, item.type, language)}`);
-        }
-        // Frontend link
-        if (item.path && client) {
-          const frontendLink = client.catalogueLink(item.path);
-          if (frontendLink) {
-            lines.push(`Frontend: ${frontendLink}`);
-          }
-        }
-        return lines.join(' | ');
-      }).join(', '));
+      parts.push(
+        items
+          .map(item => {
+            const lines: string[] = [];
+            lines.push(`${item.name} [${item.type}]`);
+            // Crystallize edit deeplink
+            if (item.id && client) {
+              lines.push(
+                `Edit: ${client.itemLink(item.id, item.type, language)}`,
+              );
+            }
+            // Frontend link
+            if (item.path && client) {
+              const frontendLink = client.catalogueLink(item.path);
+              if (frontendLink) {
+                lines.push(`Frontend: ${frontendLink}`);
+              }
+            }
+            return lines.join(' | ');
+          })
+          .join(', '),
+      );
     }
     if (variants?.length) {
       parts.push(variants.map(v => `${v.name ?? v.sku} [variant]`).join(', '));
@@ -810,7 +904,11 @@ function formatComponentContent(
 
   // ParagraphCollectionContent
   if ('paragraphs' in content) {
-    const paragraphs = content.paragraphs as { title?: { text?: string }; body?: { plainText?: string[] }; images?: { url: string; key?: string }[] }[];
+    const paragraphs = content.paragraphs as {
+      title?: { text?: string };
+      body?: { plainText?: string[] };
+      images?: { url: string; key?: string }[];
+    }[];
     if (!paragraphs?.length) {
       return '(empty paragraphs)';
     }
@@ -823,7 +921,17 @@ function formatComponentContent(
         lines.push(truncate(p.body.plainText.join(' '), 200));
       }
       if (p.images?.length) {
-        lines.push(p.images.map(img => img.url || (img.key && client ? client.mediaUrl(img.key) : img.key || 'image')).join(', '));
+        lines.push(
+          p.images
+            .map(
+              img =>
+                img.url ||
+                (img.key && client
+                  ? client.mediaUrl(img.key)
+                  : img.key || 'image'),
+            )
+            .join(', '),
+        );
       }
     }
     return lines.join('\n');
@@ -855,8 +963,20 @@ function formatComponentContent(
   }
 
   // PieceContent — a component-in-component structure
-  if ('components' in content && !('chunks' in content) && !('paragraphs' in content) && !('items' in content)) {
-    const components = content.components as { id?: string; type?: string; name?: string; content?: Record<string, unknown> }[] | null;
+  if (
+    'components' in content &&
+    !('chunks' in content) &&
+    !('paragraphs' in content) &&
+    !('items' in content)
+  ) {
+    const components = content.components as
+      | {
+          id?: string;
+          type?: string;
+          name?: string;
+          content?: Record<string, unknown>;
+        }[]
+      | null;
     if (!components?.length) {
       return '(empty piece)';
     }
@@ -874,7 +994,11 @@ function formatComponentContent(
 
   // ComponentChoiceContent
   if ('selectedComponent' in content) {
-    const sel = content.selectedComponent as { id?: string; type?: string; content?: Record<string, unknown> } | null;
+    const sel = content.selectedComponent as {
+      id?: string;
+      type?: string;
+      content?: Record<string, unknown>;
+    } | null;
     if (!sel) {
       return '(no choice selected)';
     }
@@ -889,7 +1013,8 @@ function formatComponentContent(
 }
 
 /** Common media file extensions — used to avoid false-matching filenames as domains. */
-const MEDIA_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|avif|svg|mp4|webm|mov|avi|mp3|wav|pdf|zip)$/i;
+const MEDIA_EXTENSIONS =
+  /\.(jpg|jpeg|png|gif|webp|avif|svg|mp4|webm|mov|avi|mp3|wav|pdf|zip)$/i;
 
 /**
  * Convert text that looks like a URL or catalogue path into a markdown link.
@@ -1001,5 +1126,18 @@ function truncate(text: string, max: number): string {
 
 /** Check if a formatted component value represents empty/no content. */
 function isEmptyValue(val: string): boolean {
-  return val === '(empty)' || val === '(no content)' || val === '(empty chunks)' || val === '(no images)' || val === '(no videos)' || val === '(no files)' || val === '(empty paragraphs)' || val === '(empty properties)' || val === '(no related items)' || val === '(no choice selected)' || val === '(no date)' || val === '(empty piece)';
+  return (
+    val === '(empty)' ||
+    val === '(no content)' ||
+    val === '(empty chunks)' ||
+    val === '(no images)' ||
+    val === '(no videos)' ||
+    val === '(no files)' ||
+    val === '(empty paragraphs)' ||
+    val === '(empty properties)' ||
+    val === '(no related items)' ||
+    val === '(no choice selected)' ||
+    val === '(no date)' ||
+    val === '(empty piece)'
+  );
 }
