@@ -98,6 +98,21 @@ export function catalogueTools(client: CrystallizeClient): ToolDefinition[] {
                   ... on ComponentChoiceContent {
                     selectedComponent { id name type }
                   }
+                  ... on ContentChunkContent {
+                    chunks {
+                      id
+                      name
+                      type
+                      content {
+                        ... on SingleLineContent { text }
+                        ... on RichTextContent { plainText }
+                        ... on BooleanContent { value }
+                        ... on NumericContent { number unit }
+                        ... on SelectionContent { options { key value } }
+                        ... on ImageContent { images { url altText } }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -423,6 +438,24 @@ function formatComponentContent(
   if ('options' in content) {
     const options = content.options as { key: string; value: string }[];
     return options.map(o => o.value).join(', ');
+  }
+  if ('chunks' in content) {
+    const chunks = content.chunks as Array<
+      Array<{
+        id: string;
+        name: string;
+        type: string;
+        content: Record<string, unknown> | null;
+      }>
+    >;
+    const rows = chunks.map((row, i) => {
+      const first = row[0];
+      const firstVal = first
+        ? formatComponentContent(first.content)
+        : '(empty)';
+      return `row ${i + 1}: [${first?.id ?? '?'}] ${firstVal}`;
+    });
+    return `${chunks.length} row(s) — ${rows.join(' | ')}`;
   }
 
   return JSON.stringify(content);

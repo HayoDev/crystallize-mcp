@@ -5,11 +5,25 @@
 [![license](https://img.shields.io/npm/l/@hayodev/crystallize-mcp.svg)](https://github.com/HayoDev/crystallize-mcp/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/@hayodev/crystallize-mcp.svg)](https://npmjs.org/package/@hayodev/crystallize-mcp)
 
-MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI.
+MCP server for [Crystallize](https://crystallize.com) headless commerce. Gives AI agents read and write access to your catalogue, products, shapes, orders, customers, and tenant config — with deep links back to the Crystallize UI, dry-run safety for mutations, and PII masking for customer data.
 
 Works with Claude Code, Claude Desktop, Cursor, Windsurf, Copilot, and any MCP-compatible client.
 
 ## Getting started
+
+### Setup wizard
+
+The interactive wizard handles config, auth tokens, keychain storage, and PII mode in one step:
+
+```bash
+# Project-level — writes .mcp.json in the current directory (shared with your team)
+npx @hayodev/crystallize-mcp --setup
+
+# Global — registers via `claude mcp add` (Claude Code) or writes Claude Desktop config
+npx @hayodev/crystallize-mcp --setup --global
+```
+
+### Manual config
 
 Standard MCP config (works in any client):
 
@@ -30,7 +44,7 @@ Standard MCP config (works in any client):
 Add `CRYSTALLIZE_ACCESS_TOKEN_ID` and `CRYSTALLIZE_ACCESS_TOKEN_SECRET` to the `env` block for PIM tools (shapes, orders, customers). See [Authentication](#authentication).
 
 <details>
-<summary>Claude Code</summary>
+<summary>Claude Code (CLI)</summary>
 
 ```bash
 claude mcp add crystallize \
@@ -42,24 +56,12 @@ claude mcp add crystallize \
 
 Use `--scope project` to write to `.mcp.json` (shared with your team) or `--scope user` for personal use across all projects.
 
-Or run the guided setup wizard, which can optionally store tokens in the OS keychain instead of plain text:
-
-```bash
-npx @hayodev/crystallize-mcp --setup
-```
-
 </details>
 
 <details>
 <summary>Claude Desktop</summary>
 
-Run the guided wizard — it writes directly to `claude_desktop_config.json` and can store tokens in the macOS Keychain so they never appear in the config file:
-
-```bash
-npx @hayodev/crystallize-mcp --setup --global
-```
-
-Or add the standard config manually to `~/Library/Application Support/Claude/claude_desktop_config.json`.
+Add the standard config to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
 
 </details>
 
@@ -135,13 +137,15 @@ Or copy the standard config JSON above before opening the command — Raycast wi
 </details>
 
 <details>
-<summary>From source</summary>
+<summary>From source (maintainers)</summary>
+
+The `--local` flag is for developing crystallize-mcp itself. It writes `.mcp.json` pointing to the local build output — **run this from the repo root only**:
 
 ```bash
 git clone https://github.com/HayoDev/crystallize-mcp.git
 cd crystallize-mcp
 npm install && npm run build
-npx . --setup --local   # writes .mcp.json pointing to local build
+npx . --setup --local   # writes .mcp.json pointing to ./build/
 ```
 
 Or point your MCP client directly at the built entry point:
@@ -162,7 +166,7 @@ Or point your MCP client directly at the built entry point:
 
 </details>
 
-## Tools (12)
+## Tools (16)
 
 ### Catalogue (4 tools)
 
@@ -203,6 +207,56 @@ Or point your MCP client directly at the built entry point:
 | `list_customers` | Search and list customers with pagination                    |
 | `get_customer`   | Full customer profile — addresses, meta, external references |
 
+### Content (2 tools, requires auth + write mode)
+
+| Tool               | Description                                                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| `create_item`      | Create a new item (product, document, or folder) with components                                      |
+| `update_component` | Update a single component value — supports nested content chunks via dot notation (e.g. `hero.title`) |
+
+## Write tools
+
+Write tools require `CRYSTALLIZE_ACCESS_MODE=write` (or `admin`) and a token with write permissions.
+
+### Dry-run mode
+
+Set `CRYSTALLIZE_DRY_RUN=true` to preview mutations without executing them. The response shows exactly what would change — the mutation payload, before/after values, and a deep link to the item:
+
+```json
+"env": {
+  "CRYSTALLIZE_ACCESS_MODE": "write",
+  "CRYSTALLIZE_DRY_RUN": "true"
+}
+```
+
+### Example prompts
+
+**Create an item:**
+
+> "Create a new blog post under /blog using the article shape with title 'Getting Started'"
+
+**Update a top-level component:**
+
+> "Find the item at /products/summer-collection and update its description to 'New summer arrivals'"
+
+**Update a component inside a content chunk:**
+
+> "Get the item at /articles/my-post, then update hero.title to 'Updated Headline' and give me the deep link to review the draft"
+
+**Update with change summary:**
+
+> "Get the item at /articles/guides/my-guide, update its title component to 'New Guide Title', give me the deep link, and show a table of which fields in the chunk changed vs remained unchanged with before/after values"
+
+The agent will update the target component in **draft only**, preserve all sibling components in the chunk, and return a summary like:
+
+| Component   | Status     | Before             | After              |
+| ----------- | ---------- | ------------------ | ------------------ |
+| title       | ✏️ Updated | Old Guide Title    | New Guide Title    |
+| image       | Unchanged  | _(existing image)_ | _(existing image)_ |
+| description | Unchanged  | _(existing text)_  | _(existing text)_  |
+
+No publishing happens — you review the change in the Crystallize UI via the deep link and publish when ready.
+
 ## Authentication
 
 Catalogue and Discovery tools work without auth — just set `CRYSTALLIZE_TENANT_IDENTIFIER`.
@@ -214,15 +268,16 @@ For PIM tools (shapes, tenant info, orders, customers), create an access token a
 
 ### Environment variables
 
-| Variable                          | Required | Description                                                                        |
-| --------------------------------- | -------- | ---------------------------------------------------------------------------------- |
-| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                         |
-| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                        |
-| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                         |
-| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                  |
-| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered        |
-| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses   |
-| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`) |
+| Variable                          | Required | Description                                                                            |
+| --------------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| `CRYSTALLIZE_TENANT_IDENTIFIER`   | Yes      | Your tenant identifier from `app.crystallize.com/{tenant}`                             |
+| `CRYSTALLIZE_ACCESS_TOKEN_ID`     | No       | Access token ID for PIM API                                                            |
+| `CRYSTALLIZE_ACCESS_TOKEN_SECRET` | No       | Access token secret (paired with token ID)                                             |
+| `CRYSTALLIZE_STATIC_AUTH_TOKEN`   | No       | Static auth token (alternative to ID/secret pair)                                      |
+| `CRYSTALLIZE_ACCESS_MODE`         | No       | `read` (default), `write`, or `admin` — controls which tools are registered            |
+| `CRYSTALLIZE_DRY_RUN`             | No       | `true` to preview write operations without executing — see [Write tools](#write-tools) |
+| `CRYSTALLIZE_PII_MODE`            | No       | `full` (default), `masked`, or `none` — controls PII in customer/order responses       |
+| `CRYSTALLIZE_AUDIT_LOG`           | No       | Path to write an audit log — `~` is expanded (e.g. `~/.crystallize-mcp/audit.log`)     |
 
 ### PII mode (opt-in)
 
@@ -252,7 +307,7 @@ Set `CRYSTALLIZE_AUDIT_LOG` to an absolute file path to enable structured loggin
 }
 ```
 
-One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Response content is never logged.
+One JSON line per call — timestamp, tool name, params, result (`ok`/`error`), and tenant. Write tools also log mutation metadata (before/after state) for audit trails.
 
 > **Note:** Params are logged as-is and may contain PII — for example, a `searchTerm` of `hani@example.com` or a `customerIdentifier`. Treat the audit log file as sensitive data and restrict access accordingly. Param scrubbing is on the roadmap but not yet implemented.
 
@@ -260,22 +315,22 @@ Easy to pipe into log aggregators (Datadog, CloudWatch, Splunk) — but ensure y
 
 ### Keychain storage (optional)
 
-The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. This is particularly useful for:
+The setup wizard (`npx @hayodev/crystallize-mcp --setup`) can store tokens in the OS keychain (macOS Keychain, Windows Credential Manager, or libsecret on Linux) so they never appear as plain text in config files. The MCP server resolves credentials from the keychain automatically at startup — no extra configuration needed.
 
-- **Claude Desktop users** — config is written to a JSON file with no CLI equivalent for secret management
-- **Shared `.mcp.json`** — when your project config is committed to git, keychain storage keeps tokens out of the repository
+This is useful when:
 
-When tokens are in the keychain, the config only needs `CRYSTALLIZE_TENANT_IDENTIFIER` — credentials are resolved automatically at startup.
+- **Your `.mcp.json` is committed to git** — keychain keeps tokens out of the repository
+- **You prefer not to have secrets in plain text config files** — the config only needs `CRYSTALLIZE_TENANT_IDENTIFIER`
 
-Note: CLI-based MCP clients (`claude mcp add`, Cursor, Copilot, etc.) store env vars as plain text in their config files and do not integrate with the OS keychain directly. If plain text env vars in a local config file are acceptable for your setup, the wizard's keychain option is not needed.
+When using `--setup --global` with Claude Code, this applies only if keychain storage is available and you opt into it: in that case, the wizard runs `claude mcp add` with only the non-secret env vars, and tokens are read from the keychain at runtime so they do not appear in Claude Code config. If keychain storage is unavailable or you choose not to use it, the wizard passes token env vars to `claude mcp add`, and Claude Code may store them in plain text.
 
 ### Access mode
 
 `CRYSTALLIZE_ACCESS_MODE` controls which tools the MCP server registers at startup:
 
 - **`read`** (default) — read-only tools only
-- **`write`** — includes tools that can create/update content (Phase 3)
-- **`admin`** — full access including webhooks and tenant config (Phase 3)
+- **`write`** — includes content creation and component updates (with dry-run support)
+- **`admin`** — full access including shape modifications and tenant config
 
 ## Deep links
 
