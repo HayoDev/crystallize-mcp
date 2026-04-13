@@ -14,7 +14,8 @@
     "typescript/no-unused-vars": [
       "error",
       { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
-    ]
+    ],
+    "no-shadow": "warn"
   },
   "overrides": [
     {

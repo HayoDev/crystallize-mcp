@@ -38,7 +38,18 @@ function buildComponentInput(
     case 'singleLine':
       return { ...base, singleLine: { text: String(value) } };
     case 'richText':
-      return { ...base, richText: { plainText: [String(value)] } };
+      return {
+        ...base,
+        richText: {
+          json: [
+            {
+              kind: 'block',
+              type: 'paragraph',
+              children: [{ kind: 'inline', textContent: String(value) }],
+            },
+          ],
+        },
+      };
     case 'boolean':
       return { ...base, boolean: { value: Boolean(value) } };
     case 'numeric':
@@ -66,6 +77,121 @@ function buildComponentInput(
       };
     default:
       return { ...base, [componentType]: value };
+  }
+}
+
+/** Convert PIM API component read content back to ComponentInput for round-trip mutations. */
+function contentToInput(
+  componentId: string,
+  componentType: string,
+  content: Record<string, unknown> | null | undefined,
+): ComponentInput | null {
+  const base = { componentId };
+
+  // Empty content — preserve as empty component rather than dropping
+  if (!content) {
+    switch (componentType) {
+      case 'singleLine':
+        return { ...base, singleLine: { text: '' } };
+      case 'richText':
+        return null;
+      case 'boolean':
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  switch (componentType) {
+    case 'singleLine': {
+      return {
+        ...base,
+        singleLine: { text: content.text != null ? String(content.text) : '' },
+      };
+    }
+    case 'richText': {
+      if (content.json != null) {
+        return { ...base, richText: { json: content.json } };
+      }
+      if (content.plainText != null) {
+        const text = Array.isArray(content.plainText)
+          ? content.plainText.join('\n')
+          : String(content.plainText);
+        return {
+          ...base,
+          richText: {
+            json: [
+              {
+                kind: 'block',
+                type: 'paragraph',
+                children: [{ kind: 'inline', textContent: text }],
+              },
+            ],
+          },
+        };
+      }
+      return null;
+    }
+    case 'boolean': {
+      if (content.value == null) {
+        return null;
+      }
+      return { ...base, boolean: { value: Boolean(content.value) } };
+    }
+    case 'numeric': {
+      if (content.number == null) {
+        return null;
+      }
+      const num: Record<string, unknown> = { number: Number(content.number) };
+      if (content.unit) {
+        num.unit = String(content.unit);
+      }
+      return { ...base, numeric: num };
+    }
+    case 'selection': {
+      const opts = content.options;
+      if (!Array.isArray(opts) || opts.length === 0) {
+        return null;
+      }
+      return {
+        ...base,
+        selection: {
+          keys: opts.map((o: Record<string, unknown>) => String(o.key)),
+        },
+      };
+    }
+    case 'images': {
+      const imgs = content.images;
+      if (!Array.isArray(imgs) || imgs.length === 0) {
+        return null;
+      }
+      return {
+        ...base,
+        images: imgs.map((img: Record<string, unknown>) => {
+          const out: Record<string, unknown> = {
+            key: String(img.key ?? ''),
+          };
+          if (img.altText) {
+            out.altText = String(img.altText);
+          }
+          return out;
+        }),
+      };
+    }
+    case 'itemRelations': {
+      const items = content.items;
+      if (!Array.isArray(items) || items.length === 0) {
+        return null;
+      }
+      return {
+        ...base,
+        itemRelations: {
+          itemIds: items.map((i: Record<string, unknown>) => String(i.id)),
+        },
+      };
+    }
+    default:
+      return null;
   }
 }
 
@@ -255,7 +381,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
     {
       name: 'update_component',
       description:
-        'Update a single component on a catalogue item. Use get_item to see current values and get_shape to understand component types. Respects CRYSTALLIZE_DRY_RUN — when enabled, returns a before/after preview without changing anything.',
+        'Update a single component on a catalogue item. Supports nested components inside content chunks using dot notation (e.g. "image-and-title.title"). For repeating content chunks, use rowIndex to target a specific row (0 = first row). Use get_item to see current values and get_shape to understand component types. Respects CRYSTALLIZE_DRY_RUN — when enabled, returns a before/after preview without changing anything.',
       mode: 'write',
       schema: {
         itemId: z
@@ -266,7 +392,15 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           .string()
           .min(1)
           .describe(
-            'Component ID to update — use get_shape to see available components',
+            'Component ID to update. For nested components inside content chunks, use dot notation: "chunkId.childId" (e.g. "image-and-title.title")',
+          ),
+        rowIndex: z
+          .number()
+          .int()
+          .min(0)
+          .default(0)
+          .describe(
+            'For repeating content chunks: 0-based row index to update (default: 0 = first row)',
           ),
         value: z.unknown().describe('New value for the component'),
         language: z
@@ -275,10 +409,30 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           .describe('Language code (defaults to tenant language)'),
       },
       handler: async params => {
-        const { itemId, componentId, value } = params;
+        const { value } = params;
         const language = (params.language as string) || defaultLang();
+        const componentId = String(params.componentId);
+        const itemId = String(params.itemId);
+        const rowIndex =
+          typeof params.rowIndex === 'number' ? params.rowIndex : 0;
 
-        // Fetch current item to get shape and current component value
+        // Parse dot notation for nested components
+        const parts = componentId.split('.');
+        if (parts.some(p => p.length === 0)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Invalid componentId — dot notation must not contain empty segments (e.g. ".title", "hero.", "hero..title"). Use "componentId" or "chunkId.childId".',
+              },
+            ],
+            isError: true,
+          };
+        }
+        const topLevelId = parts[0];
+        const childId = parts.length > 1 ? parts.slice(1).join('.') : undefined;
+
+        // Fetch current item via PIM API for shape info (including chunk children)
         const itemQuery = `
           query GetItemForUpdate($id: ID!, $language: String!) {
             item {
@@ -286,16 +440,19 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
                 id
                 name
                 type
-                shape { identifier name components { id name type } }
-                components {
-                  componentId
-                  type
-                  content {
-                    ... on SingleLineContent { text }
-                    ... on RichTextContent { plainText }
-                    ... on BooleanContent { value }
-                    ... on NumericContent { number unit }
-                    ... on SelectionContent { options { key value } }
+                tree { path }
+                shape {
+                  identifier
+                  name
+                  components {
+                    id
+                    name
+                    type
+                    config {
+                      ... on ContentChunkComponentConfig {
+                        components { id name type }
+                      }
+                    }
                   }
                 }
               }
@@ -306,7 +463,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         const itemData = (await client.api.pimApi(itemQuery, {
           id: itemId,
           language,
-        })) as CoreItemResponse;
+        })) as ItemForUpdateResponse;
         const item = itemData.item?.get;
 
         if (!item) {
@@ -322,8 +479,10 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         // Find the component definition on the shape
-        const compDef = item.shape?.components?.find(c => c.id === componentId);
-        if (!compDef) {
+        const topLevelComp = item.shape?.components?.find(
+          c => c.id === topLevelId,
+        );
+        if (!topLevelComp) {
           const available = (item.shape?.components ?? [])
             .map(c => c.id)
             .join(', ');
@@ -331,30 +490,233 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             content: [
               {
                 type: 'text',
-                text: `Component "${componentId}" not found on shape "${item.shape?.identifier}". Available: ${available}`,
+                text: `Component "${topLevelId}" not found on shape "${item.shape?.identifier}". Available: ${available}`,
               },
             ],
             isError: true,
           };
         }
 
-        const currentComp = item.components?.find(
-          c => c.componentId === componentId,
-        );
-        const currentValue = formatCurrentValue(currentComp);
+        // Resolve the target component type (may be nested in a chunk)
+        let targetType = topLevelComp.type;
+        let targetName = topLevelComp.name;
+        if (childId && topLevelComp.type === 'contentChunk') {
+          const chunkChildren = topLevelComp.config?.components ?? [];
+          const childComp = chunkChildren.find(
+            (c: ShapeComponent) => c.id === childId,
+          );
+          if (!childComp) {
+            const available = chunkChildren
+              .map((c: ShapeComponent) => c.id)
+              .join(', ');
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Child component "${childId}" not found in chunk "${topLevelId}". Available: ${available}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          targetType = childComp.type;
+          targetName = `${topLevelComp.name} → ${childComp.name}`;
+        } else if (childId) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Dot notation "${componentId}" is only supported for contentChunk components. "${topLevelId}" is type "${topLevelComp.type}".`,
+              },
+            ],
+            isError: true,
+          };
+        }
 
-        const componentInput = buildComponentInput(
-          componentId,
-          compDef.type,
+        // Build the component input for the Core API
+        const innerInput = buildComponentInput(
+          childId ?? topLevelId,
+          targetType,
           value,
         );
+
+        // Fetch current value and build mutation input
+        let currentValue = '(not available)';
+        let componentInput: ComponentInput;
+
+        if (childId) {
+          // For chunk children: fetch existing siblings via PIM API,
+          // extract previous value from the target child, and merge
+          let allRows: ComponentInput[][] = [[innerInput]];
+          try {
+            const chunkQuery = `
+              query GetChunkContent($id: ID!, $language: String!) {
+                item {
+                  get(id: $id, language: $language, versionLabel: draft) {
+                    components {
+                      componentId
+                      type
+                      content {
+                        ... on ContentChunkContent {
+                          chunks {
+                            componentId
+                            type
+                            content {
+                              ... on SingleLineContent { text }
+                              ... on RichTextContent { json plainText }
+                              ... on BooleanContent { value }
+                              ... on NumericContent { number unit }
+                              ... on SelectionContent { options { key value } }
+                              ... on ImageContent { images { url key altText } }
+                              ... on ItemRelationsContent { items { id } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const chunkData = (await client.api.pimApi(chunkQuery, {
+              id: itemId,
+              language,
+            })) as ChunkContentResponse;
+            const components = chunkData?.item?.get?.components ?? [];
+            const chunkComp = components.find(
+              (c: { componentId: string }) => c.componentId === topLevelId,
+            );
+            const allChunkRows: ChunkChild[][] =
+              chunkComp?.content?.chunks ?? [];
+
+            if (rowIndex >= allChunkRows.length && allChunkRows.length > 0) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `Row index ${rowIndex} is out of bounds — chunk "${topLevelId}" has ${allChunkRows.length} row(s) (0-based). Use get_item to inspect the chunk.`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+
+            const targetRow = allChunkRows[rowIndex] ?? [];
+
+            // Extract current value from the target child in the target row
+            const targetChild = targetRow.find(
+              (c: ChunkChild) => c.componentId === childId,
+            );
+            if (targetChild?.content) {
+              currentValue = formatContentValue(targetChild.content);
+            }
+
+            // Merge siblings in the target row, replacing only the target child
+            let foundTarget = false;
+            const mergedRow: ComponentInput[] = [];
+            for (const c of targetRow) {
+              if (c.componentId === childId) {
+                foundTarget = true;
+                mergedRow.push(innerInput);
+                continue;
+              }
+              const siblingInput = contentToInput(
+                c.componentId,
+                c.type,
+                c.content,
+              );
+              if (siblingInput === null) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Cannot update "${childId}" in chunk "${topLevelId}" row ${rowIndex}: sibling "${c.componentId}" has unsupported type "${c.type}". Updating would wipe that sibling's data.`,
+                    },
+                  ],
+                  isError: true,
+                };
+              }
+              mergedRow.push(siblingInput);
+            }
+            if (!foundTarget) {
+              mergedRow.push(innerInput);
+            }
+
+            // Rebuild all rows, replacing only the target row
+            allRows = allChunkRows.map((row, i) => {
+              if (i === rowIndex) {
+                return mergedRow;
+              }
+              return row
+                .map((c: ChunkChild) =>
+                  contentToInput(c.componentId, c.type, c.content),
+                )
+                .filter((x): x is ComponentInput => x !== null);
+            });
+            // If rowIndex is beyond existing rows, append
+            if (rowIndex >= allChunkRows.length) {
+              allRows.push(mergedRow);
+            }
+          } catch {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Failed to fetch existing chunk data for "${topLevelId}". Cannot safely update "${childId}" without knowing sibling values — proceeding would risk wiping sibling components.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+
+          componentInput = {
+            componentId: topLevelId,
+            contentChunk: {
+              chunks: allRows,
+            },
+          };
+        } else {
+          // For top-level components: fetch current value via Catalogue API
+          const itemPath = item.tree?.path;
+          if (itemPath) {
+            try {
+              const catQuery = `
+                query GetComponentValue($path: String!, $language: String!, $componentId: String!) {
+                  catalogue(path: $path, language: $language) {
+                    component(id: $componentId) {
+                      content {
+                        ... on SingleLineContent { text }
+                        ... on RichTextContent { plainText }
+                        ... on BooleanContent { value }
+                        ... on NumericContent { number unit }
+                        ... on SelectionContent { options { key value } }
+                      }
+                    }
+                  }
+                }
+              `;
+              const catData = (await client.api.catalogueApi(catQuery, {
+                path: itemPath,
+                language,
+                componentId: topLevelId,
+              })) as CatalogueComponentResponse;
+              const content = catData.catalogue?.component?.content;
+              if (content) {
+                currentValue = formatContentValue(content);
+              }
+            } catch {
+              // Non-critical — proceed with update even if we can't read current value
+            }
+          }
+          componentInput = innerInput;
+        }
 
         // Dry-run preview
         if (client.config.dryRun) {
           const lines = [
             `Would update component on: "${item.name}" (${item.type})`,
             `  Item ID: ${itemId}`,
-            `  Component: ${compDef.name} (${componentId}, type: ${compDef.type})`,
+            `  Component: ${targetName} (${componentId}, type: ${targetType})${childId ? `, row: ${rowIndex}` : ''}`,
             `  Language: ${language}`,
             '',
             `Current value: ${currentValue}`,
@@ -368,17 +730,16 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
         }
 
         // Execute mutation via Core API (nextPimApi)
+        // updateComponent targets a single component without affecting others
         const mutation = `
           mutation UpdateComponent($itemId: ID!, $language: String!, $component: ComponentInput!) {
-            item {
-              updateComponent(
-                itemId: $itemId
-                language: $language
-                component: $component
-              ) {
-                ... on UpdatedItem { itemId }
-                ... on BasicError { errorName message }
-              }
+            updateComponent(
+              itemId: $itemId
+              language: $language
+              component: $component
+            ) {
+              ... on UpdatedComponent { item { id } }
+              ... on BasicError { errorName message }
             }
           }
         `;
@@ -389,7 +750,7 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
           component: componentInput,
         })) as UpdateComponentResponse;
 
-        const updateResult = result.item?.updateComponent;
+        const updateResult = result.updateComponent;
         if (updateResult?.errorName) {
           return {
             content: [
@@ -407,8 +768,8 @@ export function contentTools(client: CrystallizeClient): ToolDefinition[] {
             {
               type: 'text',
               text: [
-                `Updated "${compDef.name}" on "${item.name}"`,
-                `  Component: ${componentId} (${compDef.type})`,
+                `Updated "${targetName}" on "${item.name}"`,
+                `  Component: ${componentId} (${targetType})${childId ? `, row: ${rowIndex}` : ''}`,
                 `  Previous: ${currentValue}`,
                 `  New: ${JSON.stringify(value)}`,
                 `  Edit: ${client.itemLink(itemId, item.type, language)}`,
@@ -432,27 +793,45 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function formatCurrentValue(comp: CoreComponentContent | undefined): string {
-  const c = comp?.content;
-  if (!c) {
-    return '(empty)';
+function formatContentValue(content: Record<string, unknown>): string {
+  if ('text' in content && content.text != null) {
+    return String(content.text);
   }
-  if (c.text != null) {
-    return String(c.text);
+  if ('plainText' in content && content.plainText != null) {
+    return String(content.plainText);
   }
-  if (c.plainText != null) {
-    return String(c.plainText);
+  if ('value' in content && content.value != null) {
+    return String(content.value);
   }
-  if (c.value != null) {
-    return String(c.value);
+  if ('number' in content && content.number != null) {
+    const unit = 'unit' in content && content.unit ? ` ${content.unit}` : '';
+    return `${content.number}${unit}`;
   }
-  if (c.number != null) {
-    return c.unit ? `${c.number} ${c.unit}` : String(c.number);
+  if ('options' in content && Array.isArray(content.options)) {
+    return content.options
+      .map((o: Record<string, unknown>) => o.value ?? o.key)
+      .join(', ');
   }
-  if (c.options) {
-    return c.options.map(o => o.value).join(', ');
+  if ('images' in content && Array.isArray(content.images)) {
+    const imgs = content.images as { key?: string; altText?: string }[];
+    if (imgs.length === 0) {
+      return '(no images)';
+    }
+    const label = imgs[0].altText || imgs[0].key || 'image';
+    return imgs.length === 1 ? label : `${label} (+${imgs.length - 1} more)`;
   }
-  return '(unknown)';
+  if ('items' in content && Array.isArray(content.items)) {
+    const n = content.items.length;
+    return n === 0 ? '(no relations)' : `${n} related item${n > 1 ? 's' : ''}`;
+  }
+  if ('files' in content && Array.isArray(content.files)) {
+    const n = content.files.length;
+    return n === 0 ? '(no files)' : `${n} file${n > 1 ? 's' : ''}`;
+  }
+  if ('json' in content) {
+    return '(rich text)';
+  }
+  return '(complex value)';
 }
 
 // --- Internal types ---
@@ -461,6 +840,9 @@ interface ShapeComponent {
   id: string;
   name: string;
   type: string;
+  config?: {
+    components?: ShapeComponent[];
+  };
 }
 
 interface ShapeResponse {
@@ -484,41 +866,54 @@ interface CreateItemResponse {
   };
 }
 
-interface CoreComponentContent {
-  componentId: string;
-  type: string;
-  content?: {
-    text?: string;
-    plainText?: string;
-    value?: boolean;
-    number?: number;
-    unit?: string;
-    options?: { key: string; value: string }[];
-  };
-}
-
-interface CoreItemResponse {
+interface ItemForUpdateResponse {
   item?: {
     get?: {
       id: string;
       name: string;
       type: string;
+      tree?: { path?: string };
       shape?: {
         identifier: string;
         name: string;
         components?: ShapeComponent[];
       };
-      components?: CoreComponentContent[];
+    };
+  };
+}
+
+interface ChunkChild {
+  componentId: string;
+  type: string;
+  content?: Record<string, unknown> | null;
+}
+
+interface ChunkContentResponse {
+  item?: {
+    get?: {
+      components?: {
+        componentId: string;
+        type: string;
+        content?: {
+          chunks?: ChunkChild[][];
+        };
+      }[];
+    };
+  };
+}
+
+interface CatalogueComponentResponse {
+  catalogue?: {
+    component?: {
+      content?: Record<string, unknown>;
     };
   };
 }
 
 interface UpdateComponentResponse {
-  item?: {
-    updateComponent?: {
-      itemId?: string;
-      errorName?: string;
-      message?: string;
-    };
+  updateComponent?: {
+    item?: { id: string };
+    errorName?: string;
+    message?: string;
   };
 }

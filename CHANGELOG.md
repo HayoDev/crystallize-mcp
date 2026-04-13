@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.0](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.10...crystallize-mcp-v0.2.0) (2026-04-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* setup-wizard :nail-care: ([#23](https://github.com/HayoDev/crystallize-mcp/issues/23))
+
+### 🎉 Features
+
+* setup-wizard :nail-care: ([#23](https://github.com/HayoDev/crystallize-mcp/issues/23)) ([22bd11a](https://github.com/HayoDev/crystallize-mcp/commit/22bd11a1167a80cfd34bc0986a20e38725712296))
+
+## [0.1.10](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.9...crystallize-mcp-v0.1.10) (2026-04-10)
+
+
+### 🛠️ Fixes
+
+* improve setup wizard and docs ([#21](https://github.com/HayoDev/crystallize-mcp/issues/21)) ([ece5c05](https://github.com/HayoDev/crystallize-mcp/commit/ece5c05ac252b01d1fd00b9a763808c5f0743503))
+
+## [0.1.9](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.8...crystallize-mcp-v0.1.9) (2026-04-10)
+
+
+### 🎉 Features
+
+* support content chunk updates with dot notation and fix richTex… ([#18](https://github.com/HayoDev/crystallize-mcp/issues/18)) ([a68f6b8](https://github.com/HayoDev/crystallize-mcp/commit/a68f6b8e3d4c57da475722149561ce5d96720906))
+
 ## [0.1.8](https://github.com/HayoDev/crystallize-mcp/compare/crystallize-mcp-v0.1.7...crystallize-mcp-v0.1.8) (2026-04-10)
 
 

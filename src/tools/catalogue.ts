@@ -830,6 +830,24 @@ function formatComponentContent(
     const options = content.options as { key: string; value: string }[];
     return options.map(o => o.value).join(', ');
   }
+  if ('chunks' in content) {
+    const chunks = content.chunks as Array<
+      Array<{
+        id: string;
+        name: string;
+        type: string;
+        content: Record<string, unknown> | null;
+      }>
+    >;
+    const rows = chunks.map((row, i) => {
+      const first = row[0];
+      const firstVal = first
+        ? formatComponentContent(first.content)
+        : '(empty)';
+      return `row ${i + 1}: [${first?.id ?? '?'}] ${firstVal}`;
+    });
+    return `${chunks.length} row(s) — ${rows.join(' | ')}`;
+  }
 
   // LocationContent
   if ('lat' in content && 'long' in content) {
