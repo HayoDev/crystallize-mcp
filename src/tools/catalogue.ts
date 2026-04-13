@@ -1060,7 +1060,7 @@ function linkifyText(text: string, client?: CrystallizeClient): string {
     return text;
   }
 
-  // Domain-like string without protocol (e.g. "dm.hageland.no/something")
+  // Domain-like string without protocol (e.g. "dm.domain.com/something")
   // But NOT bare filenames like "photo.jpg" or "video.mp4"
   if (
     /^[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(text) &&

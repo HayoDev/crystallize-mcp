@@ -46,7 +46,7 @@ export interface CrystallizeConfig {
   auditLog?: string;
   /** When true, write tools return a preview instead of executing mutations. */
   dryRun?: boolean;
-  /** Primary frontend URL from tenant preferences (e.g. "https://www.hageland.no"). */
+  /** Primary frontend URL from tenant preferences (e.g. "https://www.domain.com"). */
   frontendUrl?: string;
 }
 
